@@ -1,0 +1,20 @@
+# Front-controller routing for the assessment platform subfolder.
+# Every request that isn't an existing static asset is handed to index.php,
+# which does its own routing relative to /assessment/ (see index.php).
+# This does not touch rewrite rules outside this directory, so it cannot
+# interfere with the parent site's own routing.
+
+RewriteEngine On
+RewriteBase /assessment/
+
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+RewriteRule ^ index.php [L]
+
+# Defense in depth: block direct access to application internals even if
+# the RewriteRule above is ever bypassed by server misconfiguration.
+<FilesMatch "\.(sql|env)$">
+    Require all denied
+</FilesMatch>

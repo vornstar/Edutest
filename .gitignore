@@ -1,0 +1,5 @@
+.env
+assessment/.env
+vendor/
+*.log
+.DS_Store

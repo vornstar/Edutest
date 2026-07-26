@@ -1,0 +1,108 @@
+:root {
+    --color-bg: #f5f6f8;
+    --color-panel: #ffffff;
+    --color-border: #dde1e6;
+    --color-text: #1f2430;
+    --color-muted: #6b7280;
+    --color-primary: #2952e3;
+    --color-primary-contrast: #ffffff;
+    --color-danger: #b3261e;
+    --radius: 8px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--color-bg);
+    color: var(--color-text);
+}
+
+.app-header {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 0.75rem 1.5rem;
+    background: var(--color-panel);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.brand { font-weight: 700; color: var(--color-primary); text-decoration: none; }
+
+.main-nav { display: flex; gap: 1rem; flex: 1; }
+.main-nav a { color: var(--color-text); text-decoration: none; font-size: 0.9rem; }
+.main-nav a:hover { color: var(--color-primary); }
+
+.user-chip { display: flex; align-items: center; gap: 0.75rem; font-size: 0.85rem; color: var(--color-muted); }
+.user-chip a { color: var(--color-primary); text-decoration: none; }
+
+.app-main { max-width: 1100px; margin: 1.5rem auto; padding: 0 1rem; }
+
+.panel {
+    background: var(--color-panel);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+
+h1 { margin-top: 0; font-size: 1.4rem; }
+h2 { font-size: 1.1rem; margin-top: 1.75rem; }
+
+label { display: block; margin: 0.75rem 0; font-size: 0.9rem; }
+input[type="text"], input[type="number"], input[type="datetime-local"],
+input[type="file"], select, textarea {
+    display: block;
+    width: 100%;
+    margin-top: 0.25rem;
+    padding: 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    font: inherit;
+}
+
+.option { display: flex; align-items: center; gap: 0.5rem; font-weight: normal; }
+
+.btn {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    border: 1px solid var(--color-border);
+    background: var(--color-panel);
+    color: var(--color-text);
+    text-decoration: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+.btn-primary { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-primary-contrast); }
+
+.data-table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+.data-table th, .data-table td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--color-border); font-size: 0.9rem; }
+.data-table thead th { color: var(--color-muted); font-weight: 600; }
+
+.question-block { border: 1px solid var(--color-border); border-radius: 6px; padding: 1rem; margin: 1rem 0; }
+.mark-scheme { background: #fff7e6; padding: 0.5rem; border-radius: 4px; }
+.self-mark-note { color: var(--color-muted); font-style: italic; }
+
+.autosave-status { color: var(--color-muted); font-size: 0.85rem; }
+
+.pdf-split, .mark-split { display: flex; gap: 1.5rem; align-items: flex-start; }
+.pdf-pane, .script-pane { flex: 1; min-width: 0; }
+.booklet-pane, .mark-pane { flex: 1; min-width: 0; }
+.pdf-frame { width: 100%; height: 70vh; border: 1px solid var(--color-border); border-radius: 6px; }
+
+.annotation-canvas { max-width: 100%; border: 1px solid var(--color-border); border-radius: 6px; }
+.annotation-tools { display: flex; gap: 0.5rem; margin-top: 0.5rem; align-items: center; }
+.annotation-tools button, .annotation-tools input { padding: 0.4rem 0.6rem; }
+
+.alert { color: var(--color-danger); font-weight: 600; }
+
+.roster-list { columns: 2; }
+
+@media (max-width: 800px) {
+    .pdf-split, .mark-split { flex-direction: column; }
+    .main-nav { flex-wrap: wrap; }
+}
