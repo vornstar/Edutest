@@ -1,232 +1,236 @@
 <?php
-/**
- * Site-wide Microsoft Entra ID (Azure AD) OAuth 2.0 authorization-code handler.
- *
- * This file lives at the web root and is shared by every subfolder
- * application on this site (including /assessment/). It performs the
- * SSO handshake, provisions/updates the local user record, stores the
- * role-agnostic identity in the session, and returns the browser to
- * whichever application initiated the login via the `return_to` parameter.
- *
- * Actions:
- *   auth_handler.php?action=login&return_to=/assessment/
- *   auth_handler.php (no params)  -> OAuth redirect target, handles ?code=...
- *   auth_handler.php?action=logout
- */
+/*
+    Filename: auth_handler.php
+    Description: Central authentication handler for Microsoft OAuth.
+                 Handles redirection to mobile/desktop dashboards.
+                 Logs user access parameters to u781387176_core.user_logins without IP logging.
+                 Maintains dual-database synchronization for side-by-side support.
+*/
 
-declare(strict_types=1);
+header("X-Content-Type-Options: nosniff");
+header("X-Frame-Options: SAMEORIGIN");
+header("X-XSS-Protection: 1; mode=block");
+header("Referrer-Policy: strict-origin-when-cross-origin");
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' cdn.tailwindcss.com cdnjs.cloudflare.com cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' cdnjs.cloudflare.com; font-src 'self' cdnjs.cloudflare.com; img-src 'self' data:;");
+header('Content-Type: text/html; charset=utf-8');
 
-require_once __DIR__ . '/assessment/config/config.php';
-require_once __DIR__ . '/assessment/models/Database.php';
-require_once __DIR__ . '/assessment/models/Crypto.php';
+// Include root db.php to connect to the legacy database ($conn)
+include 'db.php';
 
-session_name(config('session.name'));
-session_set_cookie_params([
-    'lifetime' => 0,
-    'path' => '/',
-    'secure' => !empty($_SERVER['HTTPS']),
-    'httponly' => true,
-    'samesite' => 'Lax',
-]);
-session_start();
+require_once __DIR__ . '/includes/encryption.php';
+require_once __DIR__ . '/includes/secrets.php';
 
-const OAUTH_AUTHORITY = 'https://login.microsoftonline.com';
+// Detect mobile source: 'state=mobile' from MS OAuth or 'source=mobile' from POST
+$is_mobile = (isset($_GET['state']) && $_GET['state'] === 'mobile') ||
+             (isset($_POST['source']) && $_POST['source'] === 'mobile');
 
-function auth_redirect_uri(): string
-{
-    $configured = (string) config('azure.redirect_uri', '');
-    if ($configured !== '') {
-        return $configured;
-    }
-    $scheme = !empty($_SERVER['HTTPS']) ? 'https' : 'http';
-    return $scheme . '://' . $_SERVER['HTTP_HOST'] . '/auth_handler.php';
-}
+$clientId     = "eb393a58-2841-4188-9e8e-0dd26026b2e6";
+$tenantId     = "3df55413-ced7-4b48-8f6e-30bc4dac254f";
+$clientSecret = qmhs_env('AZURE_CLIENT_SECRET'); // see .env / .env.example - kept out of source control
+$redirectUri  = "https://www.qmhsportal.co.uk/auth_handler.php";
 
-function auth_safe_return_to(?string $path): string
-{
-    // Only allow same-site relative paths to prevent open-redirect abuse.
-    if ($path === null || $path === '' || $path[0] !== '/' || str_starts_with($path, '//')) {
-        return '/assessment/';
-    }
-    return $path;
-}
+// Added Files.Read and Files.Read.All scopes to authorise OneDrive file access
+// (Files.ReadWrite added for the assessment platform: it needs to upload exam
+// paper PDFs, scanned scripts, and mark schemes to OneDrive as well as read them.)
+$scopes = "openid profile email offline_access EduRoster.ReadBasic EduAssignments.ReadWrite Calendars.ReadWrite Tasks.Read Tasks.ReadWrite Files.ReadWrite";
 
-$action = $_GET['action'] ?? null;
-
-if ($action === 'logout') {
-    $_SESSION = [];
-    session_destroy();
-    header('Location: /');
-    exit;
-}
-
-if ($action === 'login') {
-    $returnTo = auth_safe_return_to($_GET['return_to'] ?? '/assessment/');
-    $state = bin2hex(random_bytes(16));
-    $_SESSION['oauth_state'] = $state;
-    $_SESSION['oauth_return_to'] = $returnTo;
-
-    $tenant = config('azure.tenant_id');
-    $params = http_build_query([
-        'client_id' => config('azure.client_id'),
-        'response_type' => 'code',
-        'redirect_uri' => auth_redirect_uri(),
-        'response_mode' => 'query',
-        'scope' => 'openid profile email ' . config('graph.scopes'),
-        'state' => $state,
-    ]);
-
-    header('Location: ' . OAUTH_AUTHORITY . "/{$tenant}/oauth2/v2.0/authorize?{$params}");
-    exit;
-}
-
-// --- OAuth callback (Microsoft redirects here with ?code=&state=) ---
+// --- CASE 1: MICROSOFT REDIRECT ---
 if (isset($_GET['code'])) {
-    $state = $_GET['state'] ?? '';
-    if (!hash_equals($_SESSION['oauth_state'] ?? '', $state)) {
-        http_response_code(400);
-        echo 'Invalid OAuth state.';
-        exit;
-    }
-    unset($_SESSION['oauth_state']);
+    $code = $_GET['code'];
+    $tokenUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token";
 
-    $tenant = config('azure.tenant_id');
-    $tokenResponse = auth_post_form(OAUTH_AUTHORITY . "/{$tenant}/oauth2/v2.0/token", [
-        'client_id' => config('azure.client_id'),
-        'client_secret' => config('azure.client_secret'),
-        'grant_type' => 'authorization_code',
-        'code' => $_GET['code'],
-        'redirect_uri' => auth_redirect_uri(),
-        'scope' => 'openid profile email ' . config('graph.scopes'),
-    ]);
-
-    if (!isset($tokenResponse['access_token'], $tokenResponse['id_token'])) {
-        http_response_code(502);
-        echo 'Authentication failed while contacting Microsoft Entra ID.';
-        exit;
-    }
-
-    $claims = auth_decode_id_token_claims($tokenResponse['id_token']);
-
-    $tenantId = (string) ($claims['tid'] ?? $tenant);
-    $azureUserId = (string) ($claims['oid'] ?? $claims['sub'] ?? '');
-    $email = (string) ($claims['preferred_username'] ?? $claims['email'] ?? '');
-    $displayName = (string) ($claims['name'] ?? $email);
-
-    if ($azureUserId === '' || $email === '') {
-        http_response_code(502);
-        echo 'Identity token did not contain the expected claims.';
-        exit;
-    }
-
-    $user = auth_provision_user($tenantId, $azureUserId, $email, $displayName);
-    auth_store_graph_tokens((int) $user['id'], $tokenResponse);
-
-    $_SESSION['user'] = [
-        'id' => (int) $user['id'],
-        'tenant_id' => $tenantId,
-        'azure_user_id' => $azureUserId,
-        'email' => $email,
-        'display_name' => $displayName,
-        'role_id' => (int) $user['role_id'],
+    $postData = [
+        'client_id'     => $clientId,
+        'client_secret' => $clientSecret,
+        'code'          => $code,
+        'redirect_uri'  => $redirectUri,
+        'grant_type'          => 'authorization_code',
+        'scope'         => $scopes
     ];
-    $_SESSION['login_at'] = time();
 
-    $returnTo = auth_safe_return_to($_SESSION['oauth_return_to'] ?? '/assessment/');
-    unset($_SESSION['oauth_return_to']);
-
-    header('Location: ' . $returnTo);
-    exit;
-}
-
-// No recognized action - send the user to start the login flow.
-header('Location: /auth_handler.php?action=login&return_to=' . urlencode(auth_safe_return_to($_GET['return_to'] ?? '/assessment/')));
-exit;
-
-/** @return array<string,mixed> */
-function auth_post_form(string $url, array $fields): array
-{
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => http_build_query($fields),
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded'],
-        CURLOPT_TIMEOUT => 15,
-    ]);
-    $body = curl_exec($ch);
-    $err = curl_error($ch);
+    $ch = curl_init($tokenUrl);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/x-www-form-urlencoded']);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    $response = json_decode(curl_exec($ch), true);
     curl_close($ch);
 
-    if ($body === false) {
-        error_log('auth_handler token request failed: ' . $err);
-        return [];
+    if (isset($response['access_token'])) {
+        $_SESSION['access_token'] = $response['access_token'];
+
+        // Save the refresh token and expiry
+        if (isset($response['refresh_token'])) {
+            $_SESSION['refresh_token'] = $response['refresh_token'];
+        }
+        if (isset($response['expires_in'])) {
+            $_SESSION['token_expires_at'] = time() + $response['expires_in'] - 300; // 5 minute buffer
+        }
+
+        $ch = curl_init("https://graph.microsoft.com/v1.0/me");
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer ' . $response['access_token']]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $userData = json_decode(curl_exec($ch), true);
+        curl_close($ch);
+
+        $email = strtolower(trim($userData['mail'] ?? $userData['userPrincipalName'] ?? ''));
+
+        // 1. Establish connection to the new core database
+        $coreConn = new mysqli('localhost', 'u781387176_core_admin', qmhs_env('CORE_DB_PASSWORD'), 'u781387176_core');
+        if ($coreConn->connect_error) {
+            die("Identity verification service offline.");
+        }
+        $coreConn->set_charset('utf8mb4');
+
+        $emailHash = hash('sha256', $email);
+
+        // Query the new core database
+        $stmtCore = $coreConn->prepare("SELECT id, role, full_name FROM users WHERE email_hash = ? LIMIT 1");
+        $stmtCore->bind_param("s", $emailHash);
+        $stmtCore->execute();
+        $userCore = $stmtCore->get_result()->fetch_assoc();
+
+        // Query the legacy root database ($conn)
+        $stmtLegacy = $conn->prepare("SELECT id, role, full_name FROM users WHERE LOWER(email) = ? LIMIT 1");
+        $stmtLegacy->bind_param("s", $email);
+        $stmtLegacy->execute();
+        $userLegacy = $stmtLegacy->get_result()->fetch_assoc();
+
+        $fullName = $userData['displayName'] ?? ucwords(str_replace('.', ' ', explode('@', $email)[0]));
+        $defaultRole = 'student';
+
+        // Core Database: Auto-provision if missing
+        if (!$userCore && !empty($email)) {
+            $encName = Encryption::encrypt($fullName);
+            $encEmail = Encryption::encrypt($email);
+
+            // If user already exists in legacy database, keep the same ID to prevent divergence
+            if ($userLegacy) {
+                $insertCore = $coreConn->prepare("INSERT INTO users (id, full_name, email, email_hash, role) VALUES (?, ?, ?, ?, ?)");
+                $insertCore->bind_param("issss", $userLegacy['id'], $encName, $encEmail, $emailHash, $userLegacy['role']);
+            } else {
+                $insertCore = $coreConn->prepare("INSERT INTO users (full_name, email, email_hash, role) VALUES (?, ?, ?, ?)");
+                $insertCore->bind_param("ssss", $encName, $encEmail, $emailHash, $defaultRole);
+            }
+
+            if ($insertCore->execute()) {
+                $newId = $coreConn->insert_id;
+                $userCore = [
+                    'id' => $newId,
+                    'role' => $userLegacy ? $userLegacy['role'] : $defaultRole,
+                    'full_name' => $fullName
+                ];
+            }
+        } else if ($userCore) {
+            $userCore['full_name'] = Encryption::decrypt($userCore['full_name']);
+        }
+
+        // Legacy Database: Auto-provision if missing
+        if (!$userLegacy && !empty($email)) {
+            $passwordPlaceholder = '';
+
+            // If user was created in Core, match the ID
+            if ($userCore) {
+                $insertLegacy = $conn->prepare("INSERT INTO users (id, email, role, full_name, password_hash) VALUES (?, ?, ?, ?, ?)");
+                $insertLegacy->bind_param("issss", $userCore['id'], $email, $userCore['role'], $fullName, $passwordPlaceholder);
+            } else {
+                $insertLegacy = $conn->prepare("INSERT INTO users (email, role, full_name, password_hash) VALUES (?, ?, ?, ?)");
+                $insertLegacy->bind_param("ssss", $email, $defaultRole, $fullName, $passwordPlaceholder);
+            }
+
+            if ($insertLegacy->execute()) {
+                $newId = $conn->insert_id;
+                $userLegacy = [
+                    'id' => $newId,
+                    'role' => $userCore ? $userCore['role'] : $defaultRole,
+                    'full_name' => $fullName
+                ];
+            }
+        }
+
+        $activeUser = $userCore ?: $userLegacy;
+
+        if ($activeUser) {
+            $_SESSION['user_id'] = (int)$activeUser['id'];
+            $_SESSION['role'] = strtolower($activeUser['role']);
+            $_SESSION['user_name'] = $activeUser['full_name'];
+            $_SESSION['user_email'] = $email;
+
+            // Track successful login inside core.user_logins without logging the IP address
+            $logStmt = $coreConn->prepare("INSERT INTO user_logins (user_id, user_agent) VALUES (?, ?)");
+            $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+            $logStmt->bind_param("is", $_SESSION['user_id'], $ua);
+            $logStmt->execute();
+
+            $coreConn->close();
+            handle_redirect($is_mobile, $_SESSION['role']);
+        } else {
+            $coreConn->close();
+        }
     }
-    $decoded = json_decode($body, true);
-    return is_array($decoded) ? $decoded : [];
 }
 
-/** @return array<string,mixed> */
-function auth_decode_id_token_claims(string $idToken): array
-{
-    $parts = explode('.', $idToken);
-    if (count($parts) !== 3) {
-        return [];
+function handle_redirect($is_mobile, $role) {
+    if (!empty($_SESSION['redirect_to'])) {
+        $target = filter_var($_SESSION['redirect_to'], FILTER_SANITIZE_URL);
+        unset($_SESSION['redirect_to']);
+    } else {
+        if (strpos($role, 'student') !== false) {
+            $target = $is_mobile ? "mobile/mobile_home.php" : "student_view.php?p=8ab44051";
+        } else {
+            $target = "staff_landing.php";
+        }
     }
-    $payload = base64_decode(strtr($parts[1], '-_', '+/') . str_repeat('=', (4 - strlen($parts[1]) % 4) % 4), true);
-    $claims = json_decode((string) $payload, true);
-    return is_array($claims) ? $claims : [];
+    header("Location: $target");
+    exit();
 }
 
-/** @return array<string,mixed> */
-function auth_provision_user(string $tenantId, string $azureUserId, string $email, string $displayName): array
-{
-    $pdo = Database::connection();
-
-    $stmt = $pdo->prepare('SELECT * FROM users WHERE tenant_id = :tenant_id AND azure_user_id = :azure_user_id');
-    $stmt->execute(['tenant_id' => $tenantId, 'azure_user_id' => $azureUserId]);
-    $existing = $stmt->fetch();
-
-    if ($existing) {
-        $update = $pdo->prepare('UPDATE users SET email = :email, display_name = :display_name WHERE id = :id');
-        $update->execute(['email' => $email, 'display_name' => $displayName, 'id' => $existing['id']]);
-        $existing['email'] = $email;
-        $existing['display_name'] = $displayName;
-        return $existing;
+// Helper function to refresh token silently
+function refreshMicrosoftToken() {
+    if (empty($_SESSION['refresh_token'])) {
+        return false;
     }
 
-    // New identities default to the "student" role; an Admin promotes staff
-    // accounts via the Admin portal's role management screen.
-    $insert = $pdo->prepare(
-        'INSERT INTO users (tenant_id, azure_user_id, email, display_name, role_id)
-         VALUES (:tenant_id, :azure_user_id, :email, :display_name, 1)'
-    );
-    $insert->execute([
-        'tenant_id' => $tenantId,
-        'azure_user_id' => $azureUserId,
-        'email' => $email,
-        'display_name' => $displayName,
+    $clientId     = "eb393a58-2841-4188-9e8e-0dd26026b2e6";
+    $tenantId     = "3df55413-ced7-4b48-8f6e-30bc4dac254f";
+    $clientSecret = qmhs_env('AZURE_CLIENT_SECRET');
+
+    $url = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token";
+
+    $postData = http_build_query([
+        'client_id'     => $clientId,
+        'client_secret' => $clientSecret,
+        'refresh_token' => $_SESSION['refresh_token'],
+        'grant_type'    => 'refresh_token'
     ]);
 
-    $stmt->execute(['tenant_id' => $tenantId, 'azure_user_id' => $azureUserId]);
-    return $stmt->fetch();
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+    $response = curl_exec($ch);
+    curl_close($ch);
+
+    $tokenData = json_decode($response, true);
+
+    if (isset($tokenData['access_token'])) {
+        $_SESSION['access_token'] = $tokenData['access_token'];
+        if (isset($tokenData['refresh_token'])) {
+            $_SESSION['refresh_token'] = $tokenData['refresh_token'];
+        }
+        if (isset($tokenData['expires_in'])) {
+            $_SESSION['token_expires_at'] = time() + $tokenData['expires_in'] - 300;
+        }
+        return true;
+    }
+
+    return false;
 }
 
-function auth_store_graph_tokens(int $userId, array $tokenResponse): void
-{
-    $pdo = Database::connection();
-    $expiresAt = (new DateTimeImmutable())->modify('+' . (int) ($tokenResponse['expires_in'] ?? 3600) . ' seconds');
-
-    $stmt = $pdo->prepare(
-        'INSERT INTO graph_tokens (user_id, access_token, refresh_token, expires_at)
-         VALUES (:user_id, :access_token, :refresh_token, :expires_at)
-         ON DUPLICATE KEY UPDATE access_token = VALUES(access_token),
-             refresh_token = VALUES(refresh_token), expires_at = VALUES(expires_at)'
-    );
-    $stmt->execute([
-        'user_id' => $userId,
-        'access_token' => Crypto::encrypt($tokenResponse['access_token']),
-        'refresh_token' => isset($tokenResponse['refresh_token']) ? Crypto::encrypt($tokenResponse['refresh_token']) : null,
-        'expires_at' => $expiresAt->format('Y-m-d H:i:s'),
-    ]);
+// Guard to prevent redirect if this file is included elsewhere
+if (basename($_SERVER['PHP_SELF']) === 'auth_handler.php') {
+    header("Location: index.php?error=invalid");
+    exit();
 }

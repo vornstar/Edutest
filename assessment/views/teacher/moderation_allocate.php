@@ -11,7 +11,7 @@ $markers = User::all();
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
         <label>Second marker
             <select name="secondary_marker_id" required>
-                <?php foreach ($markers as $m): if (!in_array((int) $m['role_id'], [User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER], true)) continue; ?>
+                <?php foreach ($markers as $m): if (!in_array($m['role'], [User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER], true)) continue; ?>
                     <option value="<?= (int) $m['id'] ?>"><?= htmlspecialchars($m['display_name']) ?></option>
                 <?php endforeach; ?>
             </select>

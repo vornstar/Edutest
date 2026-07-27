@@ -22,8 +22,26 @@ final class AdminController
         $admin = AuthController::requireRole([User::ROLE_ADMIN]);
         AuthController::verifyCsrf();
 
-        $roleId = (int) ($_POST['role_id'] ?? 0);
-        User::setRole($userId, $roleId, (int) $admin['id']);
+        $role = (string) ($_POST['role'] ?? '');
+        User::setRole($userId, $role, (int) $admin['id']);
+
+        header('Location: /assessment/admin/users');
+        exit;
+    }
+
+    /** Pre-provisions a colleague from the same tenant by email with a chosen role, before their first sign-in. */
+    public static function addUser(): void
+    {
+        $admin = AuthController::requireRole([User::ROLE_ADMIN]);
+        AuthController::verifyCsrf();
+
+        $email = trim((string) ($_POST['email'] ?? ''));
+        $displayName = trim((string) ($_POST['display_name'] ?? ''));
+        $role = (string) ($_POST['role'] ?? User::ROLE_STUDENT);
+
+        if ($email !== '') {
+            User::addByEmail($email, $displayName, $role, (int) $admin['id']);
+        }
 
         header('Location: /assessment/admin/users');
         exit;

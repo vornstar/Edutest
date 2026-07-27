@@ -1,6 +1,6 @@
 <?php
 /** @var array $__user */
-$roleId = (int) $__user['role_id'];
+$roleId = $__user['role'];
 ?>
 <?php if ($roleId === User::ROLE_STUDENT): ?>
     <a href="/assessment/student">My tests</a>

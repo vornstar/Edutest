@@ -2,22 +2,37 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/config.php';
-require_once __DIR__ . '/../models/Database.php';
-require_once __DIR__ . '/../models/Crypto.php';
 
 /**
- * Thin wrapper around Microsoft Graph REST calls. Uses the signed-in user's
- * delegated access token (refreshing via the stored refresh token when
- * expired) so every Graph call is scoped to what that user is authorized
- * to see - never a bare application-only token for user-facing operations.
+ * Thin wrapper around Microsoft Graph REST calls. Uses the *session's*
+ * delegated access token - the one the root /auth_handler.php already
+ * placed in $_SESSION['access_token'] when the user signed in - refreshing
+ * it via $_SESSION['refresh_token'] when expired. There is no separate
+ * token store in the assessment database: this app never runs its own
+ * OAuth login, so the site's own session is the single source of truth for
+ * Graph credentials, exactly as the rest of the site already does it.
  */
 final class GraphApiClient
 {
-    private int $userId;
+    private int $localUserId;
 
-    public function __construct(int $userId)
+    /** @param int $localUserId The assessment-local users.id of whoever should be making this call - must be the current session's user. */
+    public function __construct(int $localUserId)
     {
-        $this->userId = $userId;
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
+
+        require_once __DIR__ . '/../models/User.php';
+        $current = !empty($_SESSION['user_id'])
+            ? User::syncFromSession((int) $_SESSION['user_id'], (string) ($_SESSION['user_email'] ?? ''), (string) ($_SESSION['user_name'] ?? ''))
+            : null;
+
+        if (!$current || (int) $current['id'] !== $localUserId) {
+            throw new RuntimeException('Graph API calls may only be made on behalf of the currently signed-in user.');
+        }
+
+        $this->localUserId = $localUserId;
     }
 
     public function get(string $path, array $query = []): array
@@ -111,31 +126,26 @@ final class GraphApiClient
 
     private function accessToken(): string
     {
-        $pdo = Database::connection();
-        $stmt = $pdo->prepare('SELECT * FROM graph_tokens WHERE user_id = :user_id');
-        $stmt->execute(['user_id' => $this->userId]);
-        $row = $stmt->fetch();
-
-        if (!$row) {
-            throw new RuntimeException('No Microsoft Graph token on file for this user; please sign in again.');
+        $expiresAt = (int) ($_SESSION['token_expires_at'] ?? 0);
+        if (!empty($_SESSION['access_token']) && $expiresAt > time()) {
+            return (string) $_SESSION['access_token'];
         }
 
-        if (strtotime($row['expires_at']) - 60 > time()) {
-            return (string) Crypto::decrypt($row['access_token']);
-        }
-
-        return $this->refresh($row);
+        return $this->refresh();
     }
 
-    private function refresh(array $row): string
+    /**
+     * Mirrors refreshMicrosoftToken() from the root auth_handler.php so the
+     * two stay behaviourally identical, without requiring that whole file
+     * (with its db.php/mysqli side effects) to be included here.
+     */
+    private function refresh(): string
     {
-        $refreshToken = Crypto::decrypt($row['refresh_token']);
-        if (!$refreshToken) {
-            throw new RuntimeException('Graph session expired and no refresh token is available; please sign in again.');
+        if (empty($_SESSION['refresh_token'])) {
+            throw new RuntimeException('Microsoft Graph session expired; please sign in again.');
         }
 
-        $tenant = config('azure.tenant_id');
-        $ch = curl_init("https://login.microsoftonline.com/{$tenant}/oauth2/v2.0/token");
+        $ch = curl_init('https://login.microsoftonline.com/' . config('azure.tenant_id') . '/oauth2/v2.0/token');
         curl_setopt_array($ch, [
             CURLOPT_POST => true,
             CURLOPT_RETURNTRANSFER => true,
@@ -143,9 +153,8 @@ final class GraphApiClient
             CURLOPT_POSTFIELDS => http_build_query([
                 'client_id' => config('azure.client_id'),
                 'client_secret' => config('azure.client_secret'),
+                'refresh_token' => $_SESSION['refresh_token'],
                 'grant_type' => 'refresh_token',
-                'refresh_token' => $refreshToken,
-                'scope' => 'openid profile email ' . config('graph.scopes'),
             ]),
             CURLOPT_TIMEOUT => 15,
         ]);
@@ -157,16 +166,11 @@ final class GraphApiClient
             throw new RuntimeException('Failed to refresh Microsoft Graph token; please sign in again.');
         }
 
-        $expiresAt = (new DateTimeImmutable())->modify('+' . (int) ($decoded['expires_in'] ?? 3600) . ' seconds');
-        $update = Database::connection()->prepare(
-            'UPDATE graph_tokens SET access_token = :access_token, refresh_token = :refresh_token, expires_at = :expires_at WHERE user_id = :user_id'
-        );
-        $update->execute([
-            'access_token' => Crypto::encrypt($decoded['access_token']),
-            'refresh_token' => Crypto::encrypt($decoded['refresh_token'] ?? $refreshToken),
-            'expires_at' => $expiresAt->format('Y-m-d H:i:s'),
-            'user_id' => $this->userId,
-        ]);
+        $_SESSION['access_token'] = $decoded['access_token'];
+        if (isset($decoded['refresh_token'])) {
+            $_SESSION['refresh_token'] = $decoded['refresh_token'];
+        }
+        $_SESSION['token_expires_at'] = time() + (int) ($decoded['expires_in'] ?? 3600) - 300;
 
         return (string) $decoded['access_token'];
     }

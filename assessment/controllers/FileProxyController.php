@@ -25,8 +25,8 @@ final class FileProxyController
             exit;
         }
 
-        $roleId = (int) $user['role_id'];
-        $isOwnerTeacher = in_array($roleId, [User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER, User::ROLE_ADMIN], true);
+        $role = $user['role'];
+        $isOwnerTeacher = in_array($role, [User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER, User::ROLE_ADMIN], true);
 
         if ($kind === 'markscheme') {
             // Mark schemes are only ever released to students via the explicit
@@ -37,7 +37,7 @@ final class FileProxyController
             }
             $itemId = $paper['mark_scheme_drive_item_id'];
         } else {
-            if (!$isOwnerTeacher && $roleId !== User::ROLE_STUDENT) {
+            if (!$isOwnerTeacher && $role !== User::ROLE_STUDENT) {
                 http_response_code(403);
                 exit;
             }
@@ -61,9 +61,8 @@ final class FileProxyController
             exit;
         }
 
-        $roleId = (int) $user['role_id'];
         $isOwner = (int) $submission['student_id'] === (int) $user['id'];
-        $isStaff = in_array($roleId, [User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER, User::ROLE_ADMIN], true);
+        $isStaff = in_array($user['role'], [User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER, User::ROLE_ADMIN], true);
 
         if (!$isOwner && !$isStaff) {
             http_response_code(403);

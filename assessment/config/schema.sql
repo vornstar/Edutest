@@ -1,4 +1,9 @@
 -- Online Assessment Platform - MySQL / MariaDB schema
+-- Deployed to its own database (u781387176_assessment), deliberately
+-- decoupled from the site's u781387176_core / legacy identity databases -
+-- see models/User.php for how identity is synced in from the shared PHP
+-- session set by the site-wide root auth_handler.php.
+--
 -- All tables use InnoDB. Sensitive columns (mark schemes, model answers) are
 -- stored as VARBINARY and encrypted/decrypted in the application layer with
 -- AES-256-GCM (see models/Crypto.php). Do not store encryption keys in this DB.
@@ -6,43 +11,25 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
-CREATE TABLE IF NOT EXISTS roles (
-    id            TINYINT UNSIGNED PRIMARY KEY,
-    name          VARCHAR(32) NOT NULL UNIQUE
-) ENGINE=InnoDB;
-
-INSERT IGNORE INTO roles (id, name) VALUES
-    (1, 'student'),
-    (2, 'teacher'),
-    (3, 'subject_leader'),
-    (4, 'data'),
-    (5, 'admin');
-
+-- Local, assessment-only identity + role. `site_user_id` links back to the
+-- `id` the root login system assigns (kept in sync between its own core and
+-- legacy databases already), but is nullable so an Admin can pre-provision
+-- a colleague by email - see models/User.php::addByEmail() - before they
+-- have ever signed in. On first sign-in the row is matched by email and
+-- site_user_id is backfilled, preserving whatever role was pre-assigned.
+-- Every brand-new identity (no admin pre-provisioning, no existing row)
+-- defaults to 'student' - the roster sync and login sync paths never
+-- elevate a role on their own, only Admin > Users does.
 CREATE TABLE IF NOT EXISTS users (
     id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    tenant_id       VARCHAR(64) NOT NULL,
-    azure_user_id   VARCHAR(64) NOT NULL,
+    site_user_id    INT UNSIGNED NULL,
     email           VARCHAR(255) NOT NULL,
     display_name    VARCHAR(255) NOT NULL,
-    role_id         TINYINT UNSIGNED NOT NULL DEFAULT 1,
-    is_active       TINYINT(1) NOT NULL DEFAULT 1,
+    role            ENUM('student','teacher','subject_leader','data','admin') NOT NULL DEFAULT 'student',
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_tenant_user (tenant_id, azure_user_id),
-    KEY idx_email (email),
-    CONSTRAINT fk_users_role FOREIGN KEY (role_id) REFERENCES roles(id)
-) ENGINE=InnoDB;
-
--- Encrypted Microsoft Graph delegated tokens for the signed-in user (per-session use only)
-CREATE TABLE IF NOT EXISTS graph_tokens (
-    id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id         INT UNSIGNED NOT NULL,
-    access_token    VARBINARY(4096) NOT NULL,
-    refresh_token   VARBINARY(4096) NULL,
-    expires_at      DATETIME NOT NULL,
-    updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_user (user_id),
-    CONSTRAINT fk_tokens_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    UNIQUE KEY uq_site_user (site_user_id),
+    UNIQUE KEY uq_email (email)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS classes (

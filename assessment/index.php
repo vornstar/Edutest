@@ -8,6 +8,15 @@
 
 declare(strict_types=1);
 
+// Matches the security headers already sent by the root index.php /
+// auth_handler.php, with cdnjs.cloudflare.com additionally allowed for
+// script-src so the on-screen marking canvas can load Fabric.js/PDF.js.
+header("X-Content-Type-Options: nosniff");
+header("X-Frame-Options: SAMEORIGIN");
+header("X-XSS-Protection: 1; mode=block");
+header("Referrer-Policy: strict-origin-when-cross-origin");
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' cdnjs.cloudflare.com; font-src 'self' cdnjs.cloudflare.com; img-src 'self' data: blob:; frame-src 'self';");
+
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/controllers/AuthController.php';
 
@@ -45,6 +54,7 @@ function route_match(string $pattern, string $path): ?array
 
 $routes = [
     ['GET', '/', [HomeController::class, 'index']],
+    ['GET', '/logout', [AuthController::class, 'logout']],
 
     // Student portal
     ['GET', '/student', [StudentController::class, 'dashboard']],
@@ -94,6 +104,7 @@ $routes = [
 
     // Admin
     ['GET', '/admin/users', [AdminController::class, 'users']],
+    ['POST', '/admin/users/add', [AdminController::class, 'addUser']],
     ['POST', '/admin/users/{id}/role', [AdminController::class, 'setRole']],
     ['GET', '/admin/audit', [AdminController::class, 'auditLog']],
 ];

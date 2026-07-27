@@ -2,11 +2,9 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/GraphApiClient.php';
-require_once __DIR__ . '/../models/Database.php';
 require_once __DIR__ . '/../models/ClassRoster.php';
 require_once __DIR__ . '/../models/User.php';
 require_once __DIR__ . '/../models/TestAssignment.php';
-require_once __DIR__ . '/../config/config.php';
 
 /**
  * Microsoft Teams / Education Graph API integration: class roster sync,
@@ -53,40 +51,20 @@ final class TeamsService
             if ($email === '') {
                 continue;
             }
-            $user = $this->findOrProvisionByEmail($email, (string) ($member['displayName'] ?? $email));
+            // Every roster member is enrolled as a class-level 'student' by
+            // default - the platform's global role (student/teacher/...)
+            // is never touched here, only set explicitly by an Admin (see
+            // User::addByEmail / setRole). A member Graph reports as the
+            // class's own teacher is enrolled as class-level 'teacher' so
+            // they show up correctly on the class roster, but that still
+            // says nothing about their platform-wide role.
+            $user = User::provisionFromRoster($email, (string) ($member['displayName'] ?? $email));
             $roleInClass = ($member['primaryRole'] ?? 'student') === 'teacher' ? 'teacher' : 'student';
             ClassRoster::enroll($classId, (int) $user['id'], $roleInClass);
         }
 
         ClassRoster::markSynced($classId);
         return $classId;
-    }
-
-    private function findOrProvisionByEmail(string $email, string $displayName): array
-    {
-        $pdo = \Database::connection();
-        $stmt = $pdo->prepare('SELECT * FROM users WHERE email = :email');
-        $stmt->execute(['email' => $email]);
-        $user = $stmt->fetch();
-        if ($user) {
-            return $user;
-        }
-
-        $tenantId = (string) config('azure.tenant_id');
-        $insert = $pdo->prepare(
-            'INSERT INTO users (tenant_id, azure_user_id, email, display_name, role_id) VALUES (:tenant_id, :azure_user_id, :email, :display_name, 1)'
-        );
-        // azure_user_id is unknown until the student's own first sign-in; a
-        // placeholder tied to their email keeps the unique constraint happy
-        // and is overwritten by auth_handler.php on that first login.
-        $insert->execute([
-            'tenant_id' => $tenantId,
-            'azure_user_id' => 'pending:' . $email,
-            'email' => $email,
-            'display_name' => $displayName,
-        ]);
-        $stmt->execute(['email' => $email]);
-        return $stmt->fetch();
     }
 
     /**

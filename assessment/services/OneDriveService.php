@@ -20,10 +20,27 @@ final class OneDriveService
         $this->graph = new GraphApiClient($actingUserId);
     }
 
+    /**
+     * Deliberately does NOT fall back to '/me/drive'. A file a teacher
+     * uploads has to later be readable by that student, another marker
+     * during moderation, etc. - people whose own delegated token has no
+     * access to the uploader's personal drive at all. Every file must
+     * therefore live in one shared drive (a SharePoint document library or
+     * a dedicated shared OneDrive) that the whole school can reach via
+     * ONEDRIVE_DRIVE_ID, or downloads from anyone but the uploader will
+     * fail with a 403/404 from Graph.
+     */
     private function driveSegment(): string
     {
         $driveId = config('onedrive.drive_id');
-        return $driveId ? "/drives/{$driveId}" : '/me/drive';
+        if (!$driveId) {
+            throw new RuntimeException(
+                'ONEDRIVE_DRIVE_ID is not configured. The assessment platform needs a shared ' .
+                'drive id (a SharePoint document library or dedicated shared OneDrive) so files ' .
+                'one person uploads can be read by others - see assessment/config/config.php.'
+            );
+        }
+        return "/drives/{$driveId}";
     }
 
     /**

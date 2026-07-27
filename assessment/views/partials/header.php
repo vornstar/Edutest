@@ -19,8 +19,8 @@ $__title = $__title ?? 'Assessment Platform';
         <?php require __DIR__ . '/nav.php'; ?>
     </nav>
     <div class="user-chip">
-        <span><?= htmlspecialchars($__user['display_name']) ?> &middot; <?= htmlspecialchars(User::roleName((int) $__user['role_id'])) ?></span>
-        <a href="/auth_handler.php?action=logout">Sign out</a>
+        <span><?= htmlspecialchars($__user['display_name']) ?> &middot; <?= htmlspecialchars(User::roleName($__user['role'])) ?></span>
+        <a href="/assessment/logout">Sign out</a>
     </div>
     <?php endif; ?>
 </header>

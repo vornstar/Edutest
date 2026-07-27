@@ -10,7 +10,7 @@ final class HomeController
     public static function index(): void
     {
         $user = AuthController::requireLogin();
-        switch ((int) $user['role_id']) {
+        switch ($user['role']) {
             case User::ROLE_STUDENT:
                 header('Location: /assessment/student');
                 break;
