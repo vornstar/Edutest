@@ -17,6 +17,8 @@ require __DIR__ . '/../partials/header.php';
         </label>
         <label>Due date/time <input type="datetime-local" name="due_at"></label>
         <label><input type="checkbox" name="sync_to_teams" value="1"> Push as a Microsoft Teams Assignment</label>
+        <label><input type="checkbox" name="self_marking_enabled" value="1"> Allow self-marking for this assignment</label>
+        <p class="autosave-status">You can turn this on or off later from the class page too - e.g. leave it off while students are still sitting the test, then switch it on once everyone's finished.</p>
         <button type="submit" class="btn btn-primary">Assign</button>
     </form>
     <?php if (!$classes): ?>

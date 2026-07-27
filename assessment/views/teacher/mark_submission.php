@@ -10,14 +10,26 @@
 /** @var array $markSchemes keyed by question_id */
 $__title = 'Marking';
 require __DIR__ . '/../partials/header.php';
+
+// A photographed physical script (see ScanUploadController) can be attached
+// to ANY paper, not just pdf-type ones - so whether to show the PDF/scan
+// viewer depends on whether a scan actually exists, not on the paper's
+// nominal type. Typed answers only ever exist for a genuinely digital
+// submission with no scan attached.
+$hasScanOrPdf = $paper['type'] === 'pdf' || !empty($submission['scan_drive_item_id']);
+$hasTypedAnswers = $paper['type'] === 'digital' && empty($submission['scan_drive_item_id']);
 ?>
 <div class="panel marking-panel" data-submission-id="<?= (int) $submission['id'] ?>" data-csrf="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
     <h1><?= htmlspecialchars($paper['title']) ?></h1>
 
     <div class="mark-split">
         <div class="script-pane">
-            <?php if ($paper['type'] === 'pdf'): ?>
-                <p class="autosave-status">The student's own typing/writing on the PDF (if any) shows read-only in blue-ish tones on top - your marks go underneath, in whatever colour you pick below.</p>
+            <?php if ($hasScanOrPdf): ?>
+                <?php if ($submission['scan_drive_item_id']): ?>
+                    <p class="autosave-status">This is a photographed physical script.</p>
+                <?php else: ?>
+                    <p class="autosave-status">The student's own typing/writing on the PDF (if any) shows read-only in blue-ish tones on top - your marks go underneath, in whatever colour you pick below.</p>
+                <?php endif; ?>
                 <div class="annotation-stack">
                     <?php if ($submission['scan_drive_item_id']): ?>
                         <canvas id="annotation-canvas" class="annotation-canvas" data-pdf-src="/assessment/files/scans/<?= (int) $submission['id'] ?>"></canvas>
@@ -49,7 +61,7 @@ require __DIR__ . '/../partials/header.php';
                     <fieldset class="question-block">
                         <legend><?= htmlspecialchars($q['section'] ?? '') ?> (max <?= htmlspecialchars((string) $q['max_marks']) ?>)</legend>
 
-                        <?php if ($paper['type'] === 'digital'): ?>
+                        <?php if ($hasTypedAnswers): ?>
                             <p><strong>Answer:</strong> <?= nl2br(htmlspecialchars($answers[$qid]['answer_text'] ?? '')) ?></p>
                         <?php endif; ?>
 
@@ -97,6 +109,6 @@ window.__studentAnnotations = <?php
 ?>;
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
-<script src="/assessment/assets/js/pdf-annotate-core.js"></script>
-<script src="/assessment/assets/js/canvas-annotate.js"></script>
+<script src="<?= asset_url('/assets/js/pdf-annotate-core.js') ?>"></script>
+<script src="<?= asset_url('/assets/js/canvas-annotate.js') ?>"></script>
 <?php require __DIR__ . '/../partials/footer.php'; ?>

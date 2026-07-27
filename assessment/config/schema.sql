@@ -100,6 +100,7 @@ CREATE TABLE IF NOT EXISTS test_assignments (
     due_at              DATETIME NULL,
     status              ENUM('assigned','submitted','graded') NOT NULL DEFAULT 'assigned',
     sync_to_teams       TINYINT(1) NOT NULL DEFAULT 0,
+    self_marking_enabled TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'Set at assign-time or toggled afterward (see TestAssignment::setSelfMarking) - per-assignment, not per-paper, so a teacher can withhold it until everyone has finished',
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_assign_paper FOREIGN KEY (paper_id) REFERENCES papers(id) ON DELETE CASCADE,
     CONSTRAINT fk_assign_class FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE SET NULL,

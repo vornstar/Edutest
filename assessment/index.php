@@ -85,6 +85,8 @@ $routes = [
     ['GET', '/teacher/self-test/{id}', [TestController::class, 'takeSelfTest']],
     ['GET', '/teacher/papers/{id}/assign', [TestController::class, 'assignForm']],
     ['POST', '/teacher/papers/{id}/assign', [TestController::class, 'assign']],
+    ['POST', '/teacher/assignments/{id}/self-marking', [TestController::class, 'toggleSelfMarking']],
+    ['GET', '/teacher/papers/{id}/results', [PaperController::class, 'results']],
 
     ['GET', '/teacher/assignments/{id}/upload-scan', [ScanUploadController::class, 'form']],
     ['POST', '/teacher/assignments/{id}/upload-scan', [ScanUploadController::class, 'store']],

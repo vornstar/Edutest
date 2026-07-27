@@ -30,7 +30,7 @@ final class FileProxyController
 
         if ($kind === 'markscheme') {
             // Mark schemes are only ever released to students via the explicit
-            // self-marking workflow (paper.self_marking_enabled), never as a raw file fetch.
+            // self-marking workflow (assignment.self_marking_enabled), never as a raw file fetch.
             if (!$isOwnerTeacher) {
                 http_response_code(403);
                 exit;

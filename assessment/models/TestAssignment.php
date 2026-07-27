@@ -5,11 +5,11 @@ require_once __DIR__ . '/Database.php';
 
 final class TestAssignment
 {
-    public static function create(int $paperId, ?int $classId, int $assignedBy, ?string $dueAt, bool $syncToTeams): int
+    public static function create(int $paperId, ?int $classId, int $assignedBy, ?string $dueAt, bool $syncToTeams, bool $selfMarkingEnabled = false): int
     {
         $stmt = Database::connection()->prepare(
-            'INSERT INTO test_assignments (paper_id, class_id, assigned_by, due_at, sync_to_teams)
-             VALUES (:paper_id, :class_id, :assigned_by, :due_at, :sync_to_teams)'
+            'INSERT INTO test_assignments (paper_id, class_id, assigned_by, due_at, sync_to_teams, self_marking_enabled)
+             VALUES (:paper_id, :class_id, :assigned_by, :due_at, :sync_to_teams, :self_marking_enabled)'
         );
         $stmt->execute([
             'paper_id' => $paperId,
@@ -17,6 +17,7 @@ final class TestAssignment
             'assigned_by' => $assignedBy,
             'due_at' => $dueAt,
             'sync_to_teams' => $syncToTeams ? 1 : 0,
+            'self_marking_enabled' => $selfMarkingEnabled ? 1 : 0,
         ]);
         return (int) Database::connection()->lastInsertId();
     }
@@ -38,6 +39,31 @@ final class TestAssignment
     {
         $stmt = Database::connection()->prepare('UPDATE test_assignments SET status = :status WHERE id = :id');
         $stmt->execute(['status' => $status, 'id' => $id]);
+    }
+
+    /**
+     * Self-marking is per-assignment (not per-paper) specifically so a
+     * teacher can flip it on only once everyone's finished - e.g. leave it
+     * off while the class is still sitting the test, then enable it so
+     * early finishers can't see the mark scheme while others are still
+     * working.
+     */
+    public static function setSelfMarking(int $id, bool $enabled): void
+    {
+        $stmt = Database::connection()->prepare('UPDATE test_assignments SET self_marking_enabled = :enabled WHERE id = :id');
+        $stmt->execute(['enabled' => $enabled ? 1 : 0, 'id' => $id]);
+    }
+
+    /** Every real (non-self-test) assignment of this paper, across every class it's been assigned to - used by the Results page. */
+    public static function forPaper(int $paperId): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT a.*, c.name AS class_name FROM test_assignments a
+             INNER JOIN classes c ON c.id = a.class_id
+             WHERE a.paper_id = :paper_id ORDER BY a.created_at DESC'
+        );
+        $stmt->execute(['paper_id' => $paperId]);
+        return $stmt->fetchAll();
     }
 
     public static function forStudent(int $studentId): array

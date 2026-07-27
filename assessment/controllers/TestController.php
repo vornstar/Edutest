@@ -128,8 +128,9 @@ final class TestController
 
         $syncToTeams = !empty($_POST['sync_to_teams']) && !empty($class['teams_class_id']);
         $dueAt = !empty($_POST['due_at']) ? (string) $_POST['due_at'] : null;
+        $selfMarkingEnabled = !empty($_POST['self_marking_enabled']);
 
-        $assignmentId = TestAssignment::create($paperId, $classId, (int) $user['id'], $dueAt, $syncToTeams);
+        $assignmentId = TestAssignment::create($paperId, $classId, (int) $user['id'], $dueAt, $syncToTeams, $selfMarkingEnabled);
 
         if ($syncToTeams) {
             $paper = Paper::find($paperId);
@@ -139,6 +140,30 @@ final class TestController
         }
 
         header('Location: /assessment/teacher/classes/' . $classId);
+        exit;
+    }
+
+    /**
+     * Flips self-marking on/off for an already-assigned test - lets a
+     * teacher hold it off while the class is still sitting the test, then
+     * enable it once everyone's finished (or due date has passed) so early
+     * finishers can't see the mark scheme while others are still working.
+     */
+    public static function toggleSelfMarking(int $assignmentId): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        AuthController::verifyCsrf();
+
+        $assignment = TestAssignment::find($assignmentId);
+        if (!$assignment) {
+            http_response_code(404);
+            exit;
+        }
+        $paper = PaperController::requireManageable((int) $assignment['paper_id'], $user);
+
+        TestAssignment::setSelfMarking($assignmentId, empty($assignment['self_marking_enabled']));
+
+        header('Location: /assessment/teacher/classes/' . (int) $assignment['class_id']);
         exit;
     }
 
@@ -280,7 +305,7 @@ final class TestController
         $assignment = TestAssignment::find((int) $submission['assignment_id']);
         $paper = Paper::find((int) $assignment['paper_id']);
 
-        if (!$paper['self_marking_enabled'] || !in_array($submission['status'], ['submitted', 'self_marked'], true)) {
+        if (!$assignment['self_marking_enabled'] || !in_array($submission['status'], ['submitted', 'self_marked'], true)) {
             http_response_code(403);
             require __DIR__ . '/../views/partials/forbidden.php';
             exit;

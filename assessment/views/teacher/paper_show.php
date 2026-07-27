@@ -13,6 +13,7 @@ require __DIR__ . '/../partials/header.php';
         <div>
             <a class="btn" href="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/preview" target="_blank">Preview as student</a>
             <a class="btn" href="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/assign">Assign to class</a>
+            <a class="btn" href="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/results">Results</a>
             <?php if ($paper['status'] === 'draft'): ?>
                 <form method="post" action="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/publish" style="display:inline">
                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
@@ -30,8 +31,8 @@ require __DIR__ . '/../partials/header.php';
         </div>
     </div>
 
-    <p>Type: <?= htmlspecialchars($paper['type']) ?> &middot; Status: <?= htmlspecialchars($paper['status']) ?>
-        &middot; Self-marking: <?= $paper['self_marking_enabled'] ? 'Enabled' : 'Disabled' ?></p>
+    <p>Type: <?= htmlspecialchars($paper['type']) ?> &middot; Status: <?= htmlspecialchars($paper['status']) ?></p>
+    <p class="autosave-status">Self-marking is set per-assignment now, not per-paper - see the class page for each assignment once it's been assigned.</p>
 
     <div class="question-block">
         <h2 style="margin-top:0">Test this paper before assigning it</h2>

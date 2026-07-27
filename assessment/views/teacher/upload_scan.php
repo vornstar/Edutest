@@ -52,5 +52,5 @@ $noPhotos = ($_GET['error'] ?? '') === 'no_photos';
         <button type="submit" class="btn btn-primary" id="submit-btn" disabled>Upload as this student's submission</button>
     </form>
 </div>
-<script src="/assessment/assets/js/scan-capture.js"></script>
+<script src="<?= asset_url('/assets/js/scan-capture.js') ?>"></script>
 <?php require __DIR__ . '/../partials/footer.php'; ?>

@@ -90,3 +90,18 @@ function config(string $path, mixed $default = null): mixed
     }
     return $value;
 }
+
+/**
+ * Appends a cache-busting ?v=<mtime> to a static asset path, e.g.
+ * asset_url('/assets/css/style.css'). Without this, browsers (mobile
+ * Safari especially) can keep serving a stale cached copy of a CSS/JS file
+ * indefinitely after a deploy, since the URL never changes - the file's own
+ * last-modified time changes on every deploy, which is exactly what forces
+ * a fresh fetch.
+ */
+function asset_url(string $relativePath): string
+{
+    $diskPath = ASSESSMENT_ROOT . $relativePath;
+    $version = is_file($diskPath) ? filemtime($diskPath) : time();
+    return '/assessment' . $relativePath . '?v=' . $version;
+}

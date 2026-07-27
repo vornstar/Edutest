@@ -22,8 +22,6 @@ require __DIR__ . '/../partials/header.php';
             <label>Mark scheme PDF <input type="file" name="mark_scheme_pdf" accept="application/pdf"></label>
         </div>
 
-        <label><input type="checkbox" name="self_marking_enabled" value="1"> Allow student self-marking after submission</label>
-
         <button type="submit" class="btn btn-primary">Create paper</button>
     </form>
 </div>

@@ -72,8 +72,8 @@ if (!$previewMode) {
 <?php if (!$previewMode): ?>
 <script>window.__existingStudentAnnotations = <?= json_encode($existingStudentAnnotations) ?>;</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
-<script src="/assessment/assets/js/pdf-annotate-core.js"></script>
-<script src="/assessment/assets/js/student-pdf-annotate.js"></script>
-<script src="/assessment/assets/js/autosave.js"></script>
+<script src="<?= asset_url('/assets/js/pdf-annotate-core.js') ?>"></script>
+<script src="<?= asset_url('/assets/js/student-pdf-annotate.js') ?>"></script>
+<script src="<?= asset_url('/assets/js/autosave.js') ?>"></script>
 <?php endif; ?>
 <?php require __DIR__ . '/../partials/footer.php'; ?>

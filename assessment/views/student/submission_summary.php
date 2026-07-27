@@ -1,6 +1,7 @@
 <?php
 /** @var array $submission */
 /** @var array $paper */
+/** @var array $assignment */
 /** @var array $questions */
 /** @var array $answers */
 /** @var array $selfMarks */
@@ -13,7 +14,7 @@ require __DIR__ . '/../partials/header.php';
     <h1><?= htmlspecialchars($paper['title']) ?></h1>
     <p>Status: <strong><?= htmlspecialchars($submission['status']) ?></strong></p>
 
-    <?php if ($submission['status'] === 'submitted' && !empty($paper['self_marking_enabled'])): ?>
+    <?php if ($submission['status'] === 'submitted' && !empty($assignment['self_marking_enabled'])): ?>
         <a class="btn btn-primary" href="/assessment/student/submissions/<?= (int) $submission['id'] ?>/self-mark">Start self-marking</a>
     <?php endif; ?>
 

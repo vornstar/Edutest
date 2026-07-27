@@ -41,6 +41,6 @@ require __DIR__ . '/../partials/header.php';
     </form>
 </div>
 <?php if (!$previewMode): ?>
-<script src="/assessment/assets/js/autosave.js"></script>
+<script src="<?= asset_url('/assets/js/autosave.js') ?>"></script>
 <?php endif; ?>
 <?php require __DIR__ . '/../partials/footer.php'; ?>

@@ -7,6 +7,7 @@ require_once __DIR__ . '/../models/Question.php';
 require_once __DIR__ . '/../models/User.php';
 require_once __DIR__ . '/../models/TestAssignment.php';
 require_once __DIR__ . '/../models/Submission.php';
+require_once __DIR__ . '/../models/Mark.php';
 require_once __DIR__ . '/../services/OneDriveService.php';
 
 /**
@@ -70,7 +71,6 @@ final class PaperController
             'subject' => trim((string) ($_POST['subject'] ?? '')) ?: null,
             'type' => $type,
             'created_by' => $user['id'],
-            'self_marking_enabled' => !empty($_POST['self_marking_enabled']),
             'duration_minutes' => !empty($_POST['duration_minutes']) ? (int) $_POST['duration_minutes'] : null,
         ]);
 
@@ -124,6 +124,37 @@ final class PaperController
         $selfTest = TestAssignment::findSelfTest($paperId, (int) $user['id']);
         $selfTestSubmission = $selfTest ? Submission::findByAssignmentAndStudent((int) $selfTest['id'], (int) $user['id']) : null;
         require __DIR__ . '/../views/teacher/paper_show.php';
+    }
+
+    /**
+     * Every submission across every class this paper has been assigned to,
+     * with its status and (if marked) total score - this is both the
+     * "results" view and the place to find/re-open an already-marked
+     * submission, since MarkingController::markSubmission has no status
+     * restriction.
+     */
+    public static function results(int $paperId): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        $paper = self::requireManageable($paperId, $user);
+
+        $questions = Question::forPaper($paperId);
+        $maxTotal = array_sum(array_column($questions, 'max_marks'));
+
+        $assignments = TestAssignment::forPaper($paperId);
+        $rows = [];
+        foreach ($assignments as $assignment) {
+            foreach (Submission::forAssignment((int) $assignment['id']) as $submission) {
+                $isMarked = in_array($submission['status'], ['marked', 'moderated'], true);
+                $rows[] = [
+                    'submission' => $submission,
+                    'class_name' => $assignment['class_name'],
+                    'score' => $isMarked ? Mark::totalScore((int) $submission['id'], 'primary') : null,
+                ];
+            }
+        }
+
+        require __DIR__ . '/../views/teacher/paper_results.php';
     }
 
     public static function addQuestion(int $paperId): void
