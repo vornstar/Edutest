@@ -1,6 +1,7 @@
 <?php
 /** @var array $paper */
 /** @var array $questions */
+/** @var bool $canDelete */
 $__title = htmlspecialchars($paper['title']);
 require __DIR__ . '/../partials/header.php';
 ?>
@@ -15,6 +16,14 @@ require __DIR__ . '/../partials/header.php';
                     <button type="submit" class="btn btn-primary">Publish</button>
                 </form>
             <?php endif; ?>
+            <?php if ($canDelete): ?>
+                <form method="post" action="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/delete" style="display:inline" onsubmit="return confirm('Delete this paper permanently, including all its questions? This cannot be undone.');">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
+                    <button type="submit" class="btn btn-danger">Delete paper</button>
+                </form>
+            <?php else: ?>
+                <span class="autosave-status" title="Papers with student submissions can't be deleted.">Delete unavailable (has submissions)</span>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -26,6 +35,15 @@ require __DIR__ . '/../partials/header.php';
             <?php if ($paper['pdf_drive_item_id']): ?><a href="/assessment/files/papers/<?= (int) $paper['id'] ?>/paper" target="_blank">View exam paper PDF</a><?php endif; ?>
             <?php if ($paper['mark_scheme_drive_item_id']): ?> &middot; <a href="/assessment/files/papers/<?= (int) $paper['id'] ?>/markscheme" target="_blank">View mark scheme PDF</a><?php endif; ?>
         </p>
+
+        <h2>Replace PDF files</h2>
+        <p>Upload a new file for either slot to replace what's currently stored - leave a slot empty to keep its existing file.</p>
+        <form method="post" action="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/update-pdf" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
+            <label>New exam paper PDF <input type="file" name="paper_pdf" accept="application/pdf"></label>
+            <label>New mark scheme PDF <input type="file" name="mark_scheme_pdf" accept="application/pdf"></label>
+            <button type="submit" class="btn">Replace file(s)</button>
+        </form>
     <?php endif; ?>
 
     <h2>Questions (answer booklet structure)</h2>

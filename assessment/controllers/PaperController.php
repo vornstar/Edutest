@@ -13,10 +13,40 @@ require_once __DIR__ . '/../services/OneDriveService.php';
  */
 final class PaperController
 {
+    /**
+     * Who may manage (view/edit/delete) a given paper: its own creator,
+     * an Admin (full system access), or a Subject Leader whose managed
+     * subject (see Admin > Users) matches the paper's subject - department-
+     * wide oversight per SRS 3.2, not limited to their own papers.
+     */
+    private static function canManagePaper(array $user, array $paper): bool
+    {
+        if ((int) $paper['created_by'] === (int) $user['id']) {
+            return true;
+        }
+        if ($user['role'] === User::ROLE_ADMIN) {
+            return true;
+        }
+        if ($user['role'] === User::ROLE_SUBJECT_LEADER && !empty($user['managed_subject'])) {
+            return strcasecmp((string) $user['managed_subject'], (string) ($paper['subject'] ?? '')) === 0;
+        }
+        return false;
+    }
+
+    private static function requireManageable(int $paperId, array $user): array
+    {
+        $paper = Paper::find($paperId);
+        if (!$paper || !self::canManagePaper($user, $paper)) {
+            http_response_code(404);
+            exit;
+        }
+        return $paper;
+    }
+
     public static function index(): void
     {
         $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
-        $papers = Paper::byCreator((int) $user['id']);
+        $papers = Paper::visibleTo($user);
         require __DIR__ . '/../views/teacher/papers_index.php';
     }
 
@@ -86,12 +116,9 @@ final class PaperController
     public static function show(int $paperId): void
     {
         $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
-        $paper = Paper::find($paperId);
-        if (!$paper || (int) $paper['created_by'] !== (int) $user['id']) {
-            http_response_code(404);
-            exit;
-        }
+        $paper = self::requireManageable($paperId, $user);
         $questions = Question::forPaper($paperId);
+        $canDelete = !Paper::hasSubmissions($paperId);
         require __DIR__ . '/../views/teacher/paper_show.php';
     }
 
@@ -99,12 +126,7 @@ final class PaperController
     {
         $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         AuthController::verifyCsrf();
-
-        $paper = Paper::find($paperId);
-        if (!$paper || (int) $paper['created_by'] !== (int) $user['id']) {
-            http_response_code(404);
-            exit;
-        }
+        self::requireManageable($paperId, $user);
 
         $options = null;
         if (($_POST['type'] ?? '') === 'mcq') {
@@ -137,12 +159,7 @@ final class PaperController
     {
         $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         AuthController::verifyCsrf();
-
-        $paper = Paper::find($paperId);
-        if (!$paper || (int) $paper['created_by'] !== (int) $user['id']) {
-            http_response_code(404);
-            exit;
-        }
+        self::requireManageable($paperId, $user);
 
         if (empty($_FILES['csv_file']['tmp_name']) || !is_uploaded_file($_FILES['csv_file']['tmp_name'])) {
             http_response_code(422);
@@ -192,14 +209,70 @@ final class PaperController
     {
         $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         AuthController::verifyCsrf();
+        self::requireManageable($paperId, $user);
 
-        $paper = Paper::find($paperId);
-        if (!$paper || (int) $paper['created_by'] !== (int) $user['id']) {
-            http_response_code(404);
-            exit;
-        }
         Paper::publish($paperId);
         header('Location: /assessment/teacher/papers/' . $paperId);
+        exit;
+    }
+
+    /**
+     * Replaces the exam paper PDF and/or mark scheme PDF on an existing
+     * PDF-type paper - either field can be resubmitted independently.
+     */
+    public static function updatePdf(int $paperId): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        AuthController::verifyCsrf();
+        $paper = self::requireManageable($paperId, $user);
+
+        if ($paper['type'] !== 'pdf') {
+            http_response_code(422);
+            echo 'Only PDF-type papers have files to replace.';
+            exit;
+        }
+
+        $drive = new OneDriveService();
+
+        if (!empty($_FILES['paper_pdf']['tmp_name']) && is_uploaded_file($_FILES['paper_pdf']['tmp_name'])) {
+            self::assertPdf($_FILES['paper_pdf']);
+            $content = file_get_contents($_FILES['paper_pdf']['tmp_name']);
+            $itemId = $drive->uploadPaperPdf($paperId, 'paper.pdf', $content);
+            Paper::replacePdfFile($paperId, 'pdf_drive_item_id', $itemId);
+        }
+
+        if (!empty($_FILES['mark_scheme_pdf']['tmp_name']) && is_uploaded_file($_FILES['mark_scheme_pdf']['tmp_name'])) {
+            self::assertPdf($_FILES['mark_scheme_pdf']);
+            $content = file_get_contents($_FILES['mark_scheme_pdf']['tmp_name']);
+            $itemId = $drive->uploadPaperPdf($paperId, 'mark_scheme.pdf', $content);
+            Paper::replacePdfFile($paperId, 'mark_scheme_drive_item_id', $itemId);
+        }
+
+        header('Location: /assessment/teacher/papers/' . $paperId);
+        exit;
+    }
+
+    /**
+     * Deletes a paper (and everything under it - questions, assignments,
+     * submissions, marks - via ON DELETE CASCADE). Refused once any
+     * student has actually started/submitted work against it, so this
+     * can't accidentally destroy real student data - see
+     * Paper::hasSubmissions().
+     */
+    public static function destroy(int $paperId): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        AuthController::verifyCsrf();
+        self::requireManageable($paperId, $user);
+
+        if (Paper::hasSubmissions($paperId)) {
+            http_response_code(409);
+            echo 'This paper has student submissions against it and cannot be deleted.';
+            exit;
+        }
+
+        Paper::delete($paperId);
+        header('Location: /assessment/teacher/papers');
         exit;
     }
 }

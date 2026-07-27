@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS users (
     email           VARCHAR(255) NOT NULL,
     display_name    VARCHAR(255) NOT NULL,
     role            ENUM('student','teacher','subject_leader','data','admin') NOT NULL DEFAULT 'student',
+    managed_subject VARCHAR(128) NULL COMMENT 'For subject_leader: which papers.subject they have department-wide authority over (set by Admin)',
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uq_site_user (site_user_id),

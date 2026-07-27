@@ -183,6 +183,28 @@ final class User
         );
     }
 
+    /**
+     * Sets which subject (matched against papers.subject) a Subject Leader
+     * has department-wide authority over - e.g. deleting/managing any
+     * paper in that subject, not just their own. Meaningless for other
+     * roles, but not restricted to subject_leader here since an Admin may
+     * set it ahead of a role change.
+     */
+    public static function setManagedSubject(int $userId, ?string $subject, int $actingAdminId): void
+    {
+        $subject = $subject !== null ? trim($subject) : null;
+        $pdo = Database::connection();
+        $before = self::find($userId);
+        $stmt = $pdo->prepare('UPDATE users SET managed_subject = :subject WHERE id = :id');
+        $stmt->execute(['subject' => $subject !== '' ? $subject : null, 'id' => $userId]);
+
+        require_once __DIR__ . '/AuditLog.php';
+        AuditLog::record('user', $userId, $actingAdminId, 'managed_subject_change',
+            ['managed_subject' => $before['managed_subject'] ?? null],
+            ['managed_subject' => $subject]
+        );
+    }
+
     public static function roleName(string $role): string
     {
         return in_array($role, self::ROLES, true) ? $role : self::ROLE_STUDENT;

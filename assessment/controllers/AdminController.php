@@ -31,6 +31,18 @@ final class AdminController
         exit;
     }
 
+    /** Sets which subject (matched against papers.subject) a Subject Leader has department-wide authority over. */
+    public static function setManagedSubject(int $userId): void
+    {
+        $admin = AuthController::requireRole([User::ROLE_ADMIN]);
+        AuthController::verifyCsrf();
+
+        User::setManagedSubject($userId, (string) ($_POST['managed_subject'] ?? ''), (int) $admin['id']);
+
+        header('Location: /assessment/admin/users');
+        exit;
+    }
+
     /** Pre-provisions a colleague from the same tenant by email with a chosen role, before their first sign-in. */
     public static function addUser(): void
     {

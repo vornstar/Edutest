@@ -75,6 +75,8 @@ $routes = [
     ['POST', '/teacher/papers/{id}/questions', [PaperController::class, 'addQuestion']],
     ['POST', '/teacher/papers/{id}/bulk-import', [PaperController::class, 'bulkImport']],
     ['POST', '/teacher/papers/{id}/publish', [PaperController::class, 'publish']],
+    ['POST', '/teacher/papers/{id}/update-pdf', [PaperController::class, 'updatePdf']],
+    ['POST', '/teacher/papers/{id}/delete', [PaperController::class, 'destroy']],
     ['GET', '/teacher/papers/{id}/assign', [TestController::class, 'assignForm']],
     ['POST', '/teacher/papers/{id}/assign', [TestController::class, 'assign']],
 
@@ -106,6 +108,7 @@ $routes = [
     ['GET', '/admin/users', [AdminController::class, 'users']],
     ['POST', '/admin/users/add', [AdminController::class, 'addUser']],
     ['POST', '/admin/users/{id}/role', [AdminController::class, 'setRole']],
+    ['POST', '/admin/users/{id}/managed-subject', [AdminController::class, 'setManagedSubject']],
     ['GET', '/admin/onedrive-lookup', [AdminController::class, 'oneDriveLookup']],
     ['GET', '/admin/audit', [AdminController::class, 'auditLog']],
 ];
