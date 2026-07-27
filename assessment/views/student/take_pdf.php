@@ -29,7 +29,6 @@ if (!$previewMode) {
                 <div class="pdf-answer-tools">
                     <button type="button" data-answer-tool="pen">Pen</button>
                     <button type="button" data-answer-tool="text">Add text</button>
-                    <input type="color" data-answer-tool="color" value="#1d4ed8">
                     <button type="button" data-page-prev>&larr; Prev</button>
                     <span data-page-indicator>Page 1</span>
                     <button type="button" data-page-next>Next &rarr;</button>

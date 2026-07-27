@@ -21,6 +21,7 @@
     var pagination = null;
     var fabricCanvas = null;
     var studentStaticCanvas = null;
+    var placingText = false;
 
     PdfAnnotateCore.loadDocument(canvasEl.dataset.pdfSrc).then(function (pdfDoc) {
         pagination = PdfAnnotateCore.wirePagination(
@@ -36,6 +37,8 @@
     function renderPage(pdfDoc, pageNumber) {
         if (fabricCanvas) fabricCanvas.dispose();
         if (studentStaticCanvas) studentStaticCanvas.dispose();
+        placingText = false;
+        canvasEl.style.cursor = '';
 
         PdfAnnotateCore.renderPageToImage(pdfDoc, pageNumber, 1.4).then(function (rendered) {
             canvasEl.width = rendered.width;
@@ -47,6 +50,18 @@
             });
             fabricCanvas.freeDrawingBrush.width = 3;
             fabricCanvas.freeDrawingBrush.color = currentColor();
+            fabricCanvas.on('mouse:down', function (opt) {
+                if (!placingText) return;
+                placingText = false;
+                canvasEl.style.cursor = '';
+                var pointer = fabricCanvas.getPointer(opt.e);
+                var text = new fabric.IText('Comment', {
+                    left: pointer.x, top: pointer.y, fill: currentColor(), fontSize: 18,
+                });
+                fabricCanvas.add(text);
+                fabricCanvas.setActiveObject(text);
+                text.enterEditing();
+            });
 
             wireTools();
             loadOwnAnnotation(pageNumber);
@@ -72,19 +87,21 @@
             btn.onclick = function () {
                 var tool = btn.dataset.tool;
                 if (tool === 'pen') {
+                    placingText = false;
+                    canvasEl.style.cursor = '';
                     fabricCanvas.isDrawingMode = true;
                     fabricCanvas.freeDrawingBrush.width = 3;
                     fabricCanvas.freeDrawingBrush.color = currentColor();
                 } else if (tool === 'highlighter') {
+                    placingText = false;
+                    canvasEl.style.cursor = '';
                     fabricCanvas.isDrawingMode = true;
                     fabricCanvas.freeDrawingBrush.width = 16;
                     fabricCanvas.freeDrawingBrush.color = hexToRgba(currentColor(), 0.35);
                 } else if (tool === 'text') {
                     fabricCanvas.isDrawingMode = false;
-                    var text = new fabric.IText('Comment', {
-                        left: 40, top: 40, fill: currentColor(), fontSize: 18,
-                    });
-                    fabricCanvas.add(text);
+                    placingText = true;
+                    canvasEl.style.cursor = 'crosshair';
                 }
             };
         });

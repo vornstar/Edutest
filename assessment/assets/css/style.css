@@ -95,7 +95,13 @@ input[type="file"], select, textarea {
 .booklet-pane, .mark-pane { flex: 1; min-width: 0; }
 .pdf-frame { width: 100%; height: 70vh; border: 1px solid var(--color-border); border-radius: 6px; }
 
-.annotation-canvas { max-width: 100%; border: 1px solid var(--color-border); border-radius: 6px; }
+/* height:auto is essential here: the canvas's actual pixel size is set via
+   JS to match the rendered PDF page (often 800-1200px+ tall), and without
+   this a canvas only scales its WIDTH down to fit max-width, leaving its
+   height at that full intrinsic size - it ends up many times taller than
+   it should be, pushing (or outright covering, once flex-direction goes
+   to column on narrow/mobile screens) everything below it out of view. */
+.annotation-canvas { display: block; max-width: 100%; height: auto; border: 1px solid var(--color-border); border-radius: 6px; }
 .annotation-tools, .pdf-answer-tools { display: flex; gap: 0.5rem; margin-top: 0.5rem; align-items: center; flex-wrap: wrap; }
 .annotation-tools button, .annotation-tools input,
 .pdf-answer-tools button, .pdf-answer-tools input { padding: 0.4rem 0.6rem; }
