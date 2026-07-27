@@ -174,12 +174,23 @@ final class PaperController
         $maxTotal = $questions ? array_sum(array_column($questions, 'max_marks')) : (float) ($paper['max_marks'] ?? 0);
 
         $assignments = TestAssignment::forPaper($paperId);
+        $classes = [];
+        foreach ($assignments as $assignment) {
+            $classes[(int) $assignment['class_id']] = $assignment['class_name'];
+        }
+
+        $classFilter = !empty($_GET['class_id']) ? (int) $_GET['class_id'] : null;
+
         $rows = [];
         foreach ($assignments as $assignment) {
+            if ($classFilter !== null && (int) $assignment['class_id'] !== $classFilter) {
+                continue;
+            }
             foreach (Submission::forAssignment((int) $assignment['id']) as $submission) {
                 $isMarked = in_array($submission['status'], ['marked', 'moderated'], true);
                 $rows[] = [
                     'submission' => $submission,
+                    'class_id' => (int) $assignment['class_id'],
                     'class_name' => $assignment['class_name'],
                     'score' => $isMarked ? Mark::totalScore((int) $submission['id'], 'primary') : null,
                 ];

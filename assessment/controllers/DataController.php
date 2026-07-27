@@ -66,6 +66,7 @@ final class DataController
         $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         $papers = Paper::visibleTo($user);
 
+        $classes = [];
         $rows = [];
         foreach ($papers as $paper) {
             $questions = Question::forPaper((int) $paper['id']);
@@ -73,12 +74,14 @@ final class DataController
             $owner = User::find((int) $paper['created_by']);
 
             foreach (TestAssignment::forPaper((int) $paper['id']) as $assignment) {
+                $classes[(int) $assignment['class_id']] = $assignment['class_name'];
                 foreach (Submission::forAssignment((int) $assignment['id']) as $submission) {
                     $isMarked = in_array($submission['status'], ['marked', 'moderated'], true);
                     $rows[] = [
                         'paper_id' => $paper['id'],
                         'paper_title' => $paper['title'],
                         'teacher_name' => $owner['display_name'] ?? '—',
+                        'class_id' => (int) $assignment['class_id'],
                         'class_name' => $assignment['class_name'],
                         'student_name' => $submission['student_name'],
                         'status' => $submission['status'],
@@ -87,6 +90,12 @@ final class DataController
                     ];
                 }
             }
+        }
+        ksort($classes);
+
+        $classFilter = !empty($_GET['class_id']) ? (int) $_GET['class_id'] : null;
+        if ($classFilter !== null) {
+            $rows = array_values(array_filter($rows, static fn(array $r): bool => $r['class_id'] === $classFilter));
         }
 
         require __DIR__ . '/../views/data/department_results.php';

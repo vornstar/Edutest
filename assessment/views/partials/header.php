@@ -10,6 +10,7 @@ $__title = $__title ?? 'Assessment Platform';
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= htmlspecialchars($__title) ?></title>
 <link rel="stylesheet" href="<?= asset_url('/assets/css/style.css') ?>">
+<script src="<?= asset_url('/assets/js/nav.js') ?>" defer></script>
 </head>
 <body>
 <header class="app-header">

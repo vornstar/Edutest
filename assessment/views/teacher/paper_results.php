@@ -1,7 +1,9 @@
 <?php
 /** @var array $paper */
-/** @var array $rows each: ['submission' => array, 'class_name' => string, 'score' => float|null] */
+/** @var array $rows each: ['submission' => array, 'class_id' => int, 'class_name' => string, 'score' => float|null] */
 /** @var float $maxTotal */
+/** @var array $classes [class_id => class_name] every class this paper is assigned to */
+/** @var int|null $classFilter */
 $__title = 'Results: ' . $paper['title'];
 require __DIR__ . '/../partials/header.php';
 
@@ -17,6 +19,20 @@ $statusLabels = [
 <div class="panel">
     <h1>Results: <?= htmlspecialchars($paper['title']) ?></h1>
     <p>Out of <?= htmlspecialchars((string) $maxTotal) ?> marks.</p>
+
+    <?php if (count($classes) > 1): ?>
+        <form method="get" action="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/results" style="max-width:16rem;">
+            <label>Class
+                <select name="class_id" onchange="this.form.submit()">
+                    <option value="">All classes</option>
+                    <?php foreach ($classes as $classId => $className): ?>
+                        <option value="<?= (int) $classId ?>" <?= $classFilter === (int) $classId ? 'selected' : '' ?>><?= htmlspecialchars($className) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <noscript><button type="submit" class="btn">Filter</button></noscript>
+        </form>
+    <?php endif; ?>
 
     <table class="data-table">
         <thead><tr><th>Class</th><th>Student</th><th>Status</th><th>Score</th><th></th></tr></thead>

@@ -38,7 +38,7 @@ require __DIR__ . '/../partials/header.php';
                     &middot;
                     <a href="/assessment/teacher/assignments/<?= (int) $a['id'] ?>/upload-scan">Upload photographed scripts</a>
                     &middot;
-                    <a href="/assessment/teacher/papers/<?= (int) $a['paper_id'] ?>/results">Results</a>
+                    <a href="/assessment/teacher/papers/<?= (int) $a['paper_id'] ?>/results?class_id=<?= (int) $class['id'] ?>">Results</a>
                 </td>
             </tr>
         <?php endforeach; ?>
