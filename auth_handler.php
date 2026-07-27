@@ -29,10 +29,7 @@ $tenantId     = "3df55413-ced7-4b48-8f6e-30bc4dac254f";
 $clientSecret = qmhs_env('AZURE_CLIENT_SECRET'); // see .env.php / .env.php.example - kept out of source control
 $redirectUri  = "https://www.qmhsportal.co.uk/auth_handler.php";
 
-// Added Files.Read and Files.Read.All scopes to authorise OneDrive file access
-// (Files.ReadWrite added for the assessment platform: it needs to upload exam
-// paper PDFs, scanned scripts, and mark schemes to OneDrive as well as read them.)
-$scopes = "openid profile email offline_access EduRoster.ReadBasic EduAssignments.ReadWrite Calendars.ReadWrite Tasks.Read Tasks.ReadWrite Files.ReadWrite";
+$scopes = "openid profile email offline_access EduRoster.ReadBasic EduAssignments.ReadWrite Calendars.ReadWrite Tasks.Read Tasks.ReadWrite";
 
 // --- CASE 1: MICROSOFT REDIRECT ---
 if (isset($_GET['code'])) {
