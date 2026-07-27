@@ -2,22 +2,19 @@
 /**
  * Filename: includes/secrets.php
  * Description: Loads secrets (Azure AD client secret, database passwords,
- *              encryption keys) from a root-level .env.php file instead of
- *              hardcoding them in source. .env.php is not committed to
- *              version control - see .env.php.example for the keys it must
- *              define.
+ *              encryption keys) from a .env.php file instead of hardcoding
+ *              them in source. .env.php is not committed to version
+ *              control - see .env.php.example for the keys it must define.
  *
- *              IMPORTANT: this is named .env.php (not .env) deliberately.
- *              A plain ".env" is a static file - if a server's .htaccess
- *              access rules aren't honoured (which turned out to be the
- *              case on this host - Apache returned a 500 the moment a
- *              `Require all denied` block was added), a direct request to
- *              it gets served as plain text, secrets and all. A file ending
- *              in .php is always handed to the PHP interpreter instead of
- *              being served as-is, on every PHP host regardless of
- *              .htaccess/AllowOverride restrictions - so .env.php starts
- *              with a bare `<?php exit;` line, which makes a direct request
- *              to it return an empty response no matter what.
+ *              Looked for OUTSIDE the web-servable folder first (one
+ *              directory above the site root - e.g. next to public_html,
+ *              not inside it), which is the real fix: a file the web
+ *              server's document root doesn't contain can never be served
+ *              over HTTP, full stop, regardless of any .htaccess/PHP
+ *              handler quirk. Falls back to a copy inside the site root
+ *              (still guarded by a leading `<?php exit;` line) only if the
+ *              outside-webroot copy isn't found, so setup can't silently
+ *              fail with everything blank.
  *
  *              Shared by auth_handler.php and the assessment platform so
  *              there is exactly one place these values live on disk.
@@ -56,4 +53,15 @@ if (!function_exists('qmhs_env')) {
     }
 }
 
-qmhs_load_env(__DIR__ . '/../.env.php');
+// __DIR__ here is <site root>/includes. Two levels up is the directory
+// THAT CONTAINS the site root (e.g. one level above public_html) - a path
+// no web request can ever reach, because the web server only serves the
+// site root and below.
+$outsideWebroot = dirname(__DIR__, 2) . '/.env.php';
+$insideWebroot = __DIR__ . '/../.env.php';
+
+if (is_file($outsideWebroot)) {
+    qmhs_load_env($outsideWebroot);
+} else {
+    qmhs_load_env($insideWebroot);
+}
