@@ -38,6 +38,7 @@ $hasTypedAnswers = $paper['type'] === 'digital' && empty($submission['scan_drive
                     <button type="button" data-tool="delete">Delete selected</button>
                     <input type="color" data-tool="color" value="#e11d48">
                     <button type="button" id="save-annotation">Save annotations</button>
+                    <span class="autosave-status" id="annotation-save-status">Also saves automatically when you change page.</span>
                     <button type="button" data-page-prev>&larr; Prev</button>
                     <span data-page-indicator>Page 1</span>
                     <button type="button" data-page-next>Next &rarr;</button>

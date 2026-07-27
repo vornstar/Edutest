@@ -28,6 +28,12 @@
     var saveTimer = null;
     var placingText = false;
     var lastRendered = null;
+    // The page whose content is currently loaded into fabricCanvas - NOT
+    // the same as pagination.getPage(), which by the time renderPage() is
+    // invoked already reflects the page being navigated TO. Every save
+    // must be explicitly tagged with this, or a page switch saves the
+    // outgoing page's content under the new page's number instead.
+    var currentPage = 1;
 
     var resizeTimer = null;
     window.addEventListener('resize', function () {
@@ -52,11 +58,14 @@
     });
 
     function renderPage(pdfDoc, pageNumber) {
-        // Save whatever's on the current page before switching away from it.
+        // Save whatever's on the outgoing page before switching away from it -
+        // must pass currentPage explicitly (see its declaration above).
+        clearTimeout(saveTimer);
         if (fabricCanvas) {
-            saveNow();
+            saveNow(currentPage);
             fabricCanvas.dispose();
         }
+        currentPage = pageNumber;
         canvasEl.style.cursor = 'crosshair';
 
         PdfAnnotateCore.renderPageToImage(pdfDoc, pageNumber, 1.4).then(function (rendered) {
@@ -140,16 +149,18 @@
     function debounceSave() {
         if (statusEl) statusEl.textContent = 'Saving…';
         clearTimeout(saveTimer);
-        saveTimer = setTimeout(saveNow, 800);
+        var pageToSave = currentPage;
+        saveTimer = setTimeout(function () { saveNow(pageToSave); }, 800);
     }
 
-    function saveNow() {
-        if (!fabricCanvas || !pagination) return;
+    function saveNow(page) {
+        if (!fabricCanvas) return;
+        var pageNumber = page !== undefined ? page : currentPage;
         fetch('/assessment/student/submissions/' + submissionId + '/annotation', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                page: pagination.getPage(),
+                page: pageNumber,
                 fabric_json: fabricCanvas.toJSON(),
                 csrf_token: csrfToken,
             }),

@@ -96,8 +96,8 @@ input[type="file"], select, textarea {
    splitting the screen and capping how big the paper itself can render. */
 .pdf-split { display: flex; flex-direction: column; gap: 1.5rem; }
 .mark-split { display: flex; gap: 1.5rem; align-items: flex-start; }
-.script-pane { flex: 1; min-width: 0; }
-.mark-pane { flex: 1; min-width: 0; }
+.script-pane { flex: 2.3; min-width: 0; }
+.mark-pane { flex: 1; min-width: 0; max-width: 340px; }
 .pdf-frame { width: 100%; height: 70vh; border: 1px solid var(--color-border); border-radius: 6px; }
 
 /* height:auto is essential here: the canvas's actual pixel size is set via

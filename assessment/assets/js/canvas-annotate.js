@@ -24,6 +24,12 @@
     var studentStaticCanvas = null;
     var placingText = false;
     var lastRendered = null;
+    // The page whose content is currently loaded into fabricCanvas - NOT
+    // the same as pagination.getPage(), which by the time renderPage() is
+    // invoked already reflects the page being navigated TO. Every save
+    // must be explicitly tagged with this, or a page switch saves the
+    // outgoing page's content under the new page's number instead.
+    var currentPage = 1;
 
     var resizeTimer = null;
     window.addEventListener('resize', function () {
@@ -67,8 +73,16 @@
     });
 
     function renderPage(pdfDoc, pageNumber) {
-        if (fabricCanvas) fabricCanvas.dispose();
+        // Save whatever's on the outgoing page before switching away from it -
+        // must pass currentPage explicitly (see its declaration above).
+        // Silent: no popup, just the small status text, so paging through a
+        // multi-page script doesn't interrupt with an alert per page.
+        if (fabricCanvas) {
+            saveAnnotation(currentPage, true);
+            fabricCanvas.dispose();
+        }
         if (studentStaticCanvas) studentStaticCanvas.dispose();
+        currentPage = pageNumber;
         placingText = false;
         canvasEl.style.cursor = '';
 
@@ -153,7 +167,7 @@
 
         var saveBtn = document.getElementById('save-annotation');
         if (saveBtn) {
-            saveBtn.onclick = function () { saveAnnotation(); };
+            saveBtn.onclick = function () { saveAnnotation(currentPage, false); };
         }
     }
 
@@ -176,20 +190,31 @@
         }
     }
 
-    function saveAnnotation() {
+    /** @param {boolean} [silent] true for the automatic on-navigate/on-unload save - just updates the status text, no popup interrupting a multi-page marking session. */
+    function saveAnnotation(page, silent) {
+        if (!fabricCanvas) return;
+        var pageNumber = page !== undefined ? page : currentPage;
+        var statusEl = document.getElementById('annotation-save-status');
+        if (statusEl) statusEl.textContent = 'Saving…';
         fetch('/assessment/teacher/marking/' + submissionId + '/annotation', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                page: pagination.getPage(),
+                page: pageNumber,
                 fabric_json: fabricCanvas.toJSON(),
                 csrf_token: csrfToken,
             }),
         }).then(function (res) {
             if (!res.ok) throw new Error('save failed');
-            alert('Annotations saved.');
+            if (statusEl) statusEl.textContent = 'Saved at ' + new Date().toLocaleTimeString();
+            if (!silent) alert('Annotations saved.');
         }).catch(function () {
-            alert('Failed to save annotations.');
+            if (statusEl) statusEl.textContent = 'Save failed - check your connection.';
+            if (!silent) alert('Failed to save annotations.');
         });
     }
+
+    window.addEventListener('beforeunload', function () {
+        if (fabricCanvas) saveAnnotation(currentPage, true);
+    });
 })();
