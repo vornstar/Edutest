@@ -147,7 +147,7 @@ final class TestController
         $content = file_get_contents($_FILES['scan']['tmp_name']);
         $ext = pathinfo($_FILES['scan']['name'], PATHINFO_EXTENSION) ?: 'pdf';
 
-        $drive = new OneDriveService((int) $user['id']);
+        $drive = new OneDriveService();
         $itemId = $drive->uploadScannedScript((int) $assignment['paper_id'], (int) $user['id'], $content, strtolower($ext));
 
         Submission::attachScan($submissionId, $itemId);

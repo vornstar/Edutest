@@ -43,16 +43,16 @@ final class PaperController
         ]);
 
         if ($type === 'pdf' && !empty($_FILES['paper_pdf']['tmp_name'])) {
-            self::attachPdfUploads($paperId, $user);
+            self::attachPdfUploads($paperId);
         }
 
         header('Location: /assessment/teacher/papers/' . $paperId);
         exit;
     }
 
-    private static function attachPdfUploads(int $paperId, array $user): void
+    private static function attachPdfUploads(int $paperId): void
     {
-        $drive = new OneDriveService((int) $user['id']);
+        $drive = new OneDriveService();
 
         $pdfItemId = null;
         if (!empty($_FILES['paper_pdf']['tmp_name']) && is_uploaded_file($_FILES['paper_pdf']['tmp_name'])) {

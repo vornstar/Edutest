@@ -49,7 +49,7 @@ final class FileProxyController
             exit;
         }
 
-        self::stream((int) $user['id'], (string) $itemId, 'paper.pdf');
+        self::stream((string) $itemId, 'paper.pdf');
     }
 
     public static function scannedScript(int $submissionId): void
@@ -69,12 +69,12 @@ final class FileProxyController
             exit;
         }
 
-        self::stream((int) $user['id'], (string) $submission['scan_drive_item_id'], 'script.pdf');
+        self::stream((string) $submission['scan_drive_item_id'], 'script.pdf');
     }
 
-    private static function stream(int $actingUserId, string $driveItemId, string $downloadName): void
+    private static function stream(string $driveItemId, string $downloadName): void
     {
-        $drive = new OneDriveService($actingUserId);
+        $drive = new OneDriveService();
         try {
             $bytes = $drive->downloadById($driveItemId);
         } catch (Throwable $e) {

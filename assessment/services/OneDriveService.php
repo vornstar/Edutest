@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/GraphApiClient.php';
+require_once __DIR__ . '/GraphAppClient.php';
 require_once __DIR__ . '/../config/config.php';
 
 /**
@@ -10,25 +10,31 @@ require_once __DIR__ . '/../config/config.php';
  * OneDrive URL - files are only ever streamed back through
  * controllers/FileProxyController.php so access stays gated by our own
  * RBAC checks (see SRS 5.2 and 6.3).
+ *
+ * Uses GraphAppClient - an app-only (client-credentials) Graph connection,
+ * NOT the signed-in user's own delegated token. This is deliberate: with a
+ * delegated token, whoever is currently browsing would need their own
+ * Microsoft 365 permission on the storage drive/folder just to view a
+ * file (which is exactly the "students need read/write on the Teams
+ * folder" problem this replaces), defeating the point of proxying access
+ * through this app's own RBAC in the first place. With an app-only token,
+ * no student or teacher needs any Microsoft permission on the drive at
+ * all - see GraphAppClient.php for the one-time Azure AD admin consent
+ * this requires.
  */
 final class OneDriveService
 {
-    private GraphApiClient $graph;
+    private GraphAppClient $graph;
 
-    public function __construct(int $actingUserId)
+    public function __construct()
     {
-        $this->graph = new GraphApiClient($actingUserId);
+        $this->graph = new GraphAppClient();
     }
 
     /**
-     * Deliberately does NOT fall back to '/me/drive'. A file a teacher
-     * uploads has to later be readable by that student, another marker
-     * during moderation, etc. - people whose own delegated token has no
-     * access to the uploader's personal drive at all. Every file must
-     * therefore live in one shared drive (a SharePoint document library or
-     * a dedicated shared OneDrive) that the whole school can reach via
-     * ONEDRIVE_DRIVE_ID, or downloads from anyone but the uploader will
-     * fail with a 403/404 from Graph.
+     * Every file lives in one shared drive (a SharePoint document library
+     * or a dedicated shared OneDrive), configured via ONEDRIVE_DRIVE_ID -
+     * there is no per-user drive to fall back to with an app-only token.
      */
     private function driveSegment(): string
     {
@@ -36,8 +42,8 @@ final class OneDriveService
         if (!$driveId) {
             throw new RuntimeException(
                 'ONEDRIVE_DRIVE_ID is not configured. The assessment platform needs a shared ' .
-                'drive id (a SharePoint document library or dedicated shared OneDrive) so files ' .
-                'one person uploads can be read by others - see assessment/config/config.php.'
+                'drive id (a SharePoint document library or dedicated shared OneDrive) - see ' .
+                'Admin > OneDrive setup, or assessment/config/config.php.'
             );
         }
         return "/drives/{$driveId}";
