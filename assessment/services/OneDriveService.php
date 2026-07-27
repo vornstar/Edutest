@@ -50,12 +50,25 @@ final class OneDriveService
     }
 
     /**
+     * Path-addressed URLs (as opposed to item-id ones) need an explicit
+     * /root segment before the colon - Graph's syntax is
+     * /drives/{drive-id}/root:/{item-path}:/content, not
+     * /drives/{drive-id}:/{item-path}:/content (which 400s with "Resource
+     * not found for the segment 'content'", since Graph never resolves the
+     * colon-path to begin with).
+     */
+    private function pathSegment(string $itemPath): string
+    {
+        return $this->driveSegment() . '/root:' . $itemPath;
+    }
+
+    /**
      * Uploads an exam paper or mark scheme PDF into /Assessments/Papers/{paperId}/.
      */
     public function uploadPaperPdf(int $paperId, string $filename, string $binaryContent): string
     {
         $folder = config('onedrive.root_folder') . "/Papers/{$paperId}";
-        $path = $this->driveSegment() . ":{$folder}/{$filename}:/content";
+        $path = $this->pathSegment("{$folder}/{$filename}") . ':/content';
         $result = $this->graph->putBinary($path, $binaryContent, 'application/pdf');
         return (string) $result['id'];
     }
@@ -67,7 +80,7 @@ final class OneDriveService
     public function uploadScannedScript(int $paperId, int $studentId, string $binaryContent, string $extension = 'pdf'): string
     {
         $folder = config('onedrive.root_folder') . "/{$paperId}";
-        $path = $this->driveSegment() . ":{$folder}/{$studentId}.{$extension}:/content";
+        $path = $this->pathSegment("{$folder}/{$studentId}.{$extension}") . ':/content';
         $contentType = $extension === 'pdf' ? 'application/pdf' : 'image/' . $extension;
         $result = $this->graph->putBinary($path, $binaryContent, $contentType);
         return (string) $result['id'];
