@@ -92,6 +92,12 @@ final class GraphApiClient
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $this->accessToken()],
             CURLOPT_TIMEOUT => 60,
+            // Graph's .../content endpoint responds with a redirect to the
+            // actual (pre-authenticated) blob storage URL rather than the
+            // file bytes directly - without this, curl returns the
+            // redirect response itself (empty/tiny) as if it had
+            // succeeded, producing a corrupt file with no error anywhere.
+            CURLOPT_FOLLOWLOCATION => true,
         ]);
         $body = curl_exec($ch);
         $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
