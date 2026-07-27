@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/AuthController.php';
 require_once __DIR__ . '/../models/User.php';
 require_once __DIR__ . '/../models/AuditLog.php';
+require_once __DIR__ . '/../models/ClassRoster.php';
 require_once __DIR__ . '/../services/GraphApiClient.php';
 
 /**
@@ -49,10 +50,18 @@ final class AdminController
     }
 
     /**
-     * One-time setup helper: lists the shared drives (Teams/SharePoint)
-     * this admin can see, with their Graph drive ids, so ONEDRIVE_DRIVE_ID
-     * can be filled in without anyone having to use Graph Explorer or the
-     * API directly.
+     * One-time setup helper: lists shared drives this admin can see, with
+     * their Graph drive ids, so ONEDRIVE_DRIVE_ID can be filled in without
+     * anyone having to use Graph Explorer or the API directly.
+     *
+     * Deliberately does NOT call /me/joinedTeams to enumerate every Team -
+     * that needs Team.ReadBasic.All, a scope not currently granted (and
+     * asking for it means another round of re-consent for everyone).
+     * Instead, for each class already imported via Teacher > Classes >
+     * Import, it looks up that specific class's own Team drive via
+     * /groups/{teamsClassId}/drive - the same pattern the school's other
+     * Graph-integrated module uses for uploading files to a class's Team,
+     * and it only needs the Files scope already granted.
      */
     public static function oneDriveLookup(): void
     {
@@ -73,23 +82,21 @@ final class AdminController
             $errors[] = 'Could not read the organisation site drive: ' . $e->getMessage();
         }
 
-        try {
-            $teams = $graph->get('/me/joinedTeams');
-            foreach ($teams['value'] ?? [] as $team) {
-                $teamId = (string) $team['id'];
-                try {
-                    $drive = $graph->get("/groups/{$teamId}/drive");
-                    $candidates[] = [
-                        'label' => 'Team: ' . ($team['displayName'] ?? $teamId),
-                        'id' => $drive['id'] ?? null,
-                        'note' => 'Everyone in this Team can read/write files here via their own delegated permissions.',
-                    ];
-                } catch (Throwable $e) {
-                    // Skip teams whose drive can't be read (e.g. archived team) rather than failing the whole page.
-                }
+        $linkedClasses = ClassRoster::allTeamsLinked();
+        if (empty($linkedClasses)) {
+            $errors[] = 'No classes have been imported from Teams yet, so no class Team drives can be listed. Import at least one class (Teacher > Classes > Import from Teams) first, or just use the whole-organisation option above.';
+        }
+        foreach ($linkedClasses as $class) {
+            try {
+                $drive = $graph->get('/groups/' . $class['teams_class_id'] . '/drive');
+                $candidates[] = [
+                    'label' => 'Class Team: ' . $class['name'],
+                    'id' => $drive['id'] ?? null,
+                    'note' => 'Everyone in this Team can read/write files here via their own delegated permissions.',
+                ];
+            } catch (Throwable $e) {
+                $errors[] = 'Could not read the Team drive for "' . $class['name'] . '": ' . $e->getMessage();
             }
-        } catch (Throwable $e) {
-            $errors[] = 'Could not list your joined Teams: ' . $e->getMessage();
         }
 
         require __DIR__ . '/../views/admin/onedrive_lookup.php';

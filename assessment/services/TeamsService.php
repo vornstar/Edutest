@@ -24,8 +24,9 @@ final class TeamsService
     /** Lists the Teams classes (education classes / M365 groups) the signed-in teacher owns. */
     public function listMyClasses(): array
     {
-        $result = $this->graph->get('/education/me/classes');
-        return $result['value'] ?? [];
+        return $this->graph->getAll('/education/me/classes', [
+            '$select' => 'id,displayName,description,externalName,term',
+        ]);
     }
 
     /**
@@ -45,8 +46,10 @@ final class TeamsService
             $teamsClassId
         );
 
-        $members = $this->graph->get("/education/classes/{$teamsClassId}/members");
-        foreach ($members['value'] ?? [] as $member) {
+        $members = $this->graph->getAll("/education/classes/{$teamsClassId}/members", [
+            '$select' => 'id,displayName,mail,userPrincipalName,primaryRole',
+        ]);
+        foreach ($members as $member) {
             $email = strtolower((string) ($member['mail'] ?? $member['userPrincipalName'] ?? ''));
             if ($email === '') {
                 continue;

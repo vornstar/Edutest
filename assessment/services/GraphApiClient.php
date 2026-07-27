@@ -40,6 +40,32 @@ final class GraphApiClient
         return $this->request('GET', $path, $query);
     }
 
+    /**
+     * Fetches every page of a Graph collection, following @odata.nextLink -
+     * needed because education/classes rosters etc. can exceed a single
+     * page. Returns the combined 'value' array across all pages.
+     */
+    public function getAll(string $path, array $query = []): array
+    {
+        $url = rtrim((string) config('graph.base'), '/') . $path;
+        if ($query) {
+            $url .= '?' . http_build_query($query);
+        }
+
+        $items = [];
+        $next = $url;
+        $guard = 0;
+        while ($next && $guard < 25) {
+            $page = $this->requestAbsoluteUrl('GET', $next);
+            if (!empty($page['value'])) {
+                $items = array_merge($items, $page['value']);
+            }
+            $next = $page['@odata.nextLink'] ?? null;
+            $guard++;
+        }
+        return $items;
+    }
+
     public function post(string $path, array $body): array
     {
         return $this->request('POST', $path, [], $body);
@@ -83,7 +109,11 @@ final class GraphApiClient
         if ($query) {
             $url .= '?' . http_build_query($query);
         }
+        return $this->requestAbsoluteUrl($method, $url, $jsonBody, $rawBody, $contentType);
+    }
 
+    private function requestAbsoluteUrl(string $method, string $url, ?array $jsonBody = null, ?string $rawBody = null, ?string $contentType = null): array
+    {
         $headers = ['Authorization: Bearer ' . $this->accessToken()];
         $payload = null;
 

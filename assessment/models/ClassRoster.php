@@ -40,6 +40,15 @@ final class ClassRoster
         return $stmt->fetchAll();
     }
 
+    /** Every class (any teacher) that's actually linked to a Teams class - used by the Admin > OneDrive setup lookup. */
+    public static function allTeamsLinked(): array
+    {
+        $stmt = Database::connection()->query(
+            'SELECT * FROM classes WHERE teams_class_id IS NOT NULL ORDER BY name'
+        );
+        return $stmt->fetchAll();
+    }
+
     public static function markSynced(int $classId): void
     {
         $stmt = Database::connection()->prepare('UPDATE classes SET last_synced_at = NOW() WHERE id = :id');
