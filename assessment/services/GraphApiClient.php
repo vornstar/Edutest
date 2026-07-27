@@ -35,9 +35,9 @@ final class GraphApiClient
         $this->localUserId = $localUserId;
     }
 
-    public function get(string $path, array $query = []): array
+    public function get(string $path, array $query = [], array $extraHeaders = []): array
     {
-        return $this->request('GET', $path, $query);
+        return $this->request('GET', $path, $query, null, null, null, $extraHeaders);
     }
 
     /**
@@ -103,18 +103,18 @@ final class GraphApiClient
         return $body;
     }
 
-    private function request(string $method, string $path, array $query = [], ?array $jsonBody = null, ?string $rawBody = null, ?string $contentType = null): array
+    private function request(string $method, string $path, array $query = [], ?array $jsonBody = null, ?string $rawBody = null, ?string $contentType = null, array $extraHeaders = []): array
     {
         $url = rtrim((string) config('graph.base'), '/') . $path;
         if ($query) {
             $url .= '?' . http_build_query($query);
         }
-        return $this->requestAbsoluteUrl($method, $url, $jsonBody, $rawBody, $contentType);
+        return $this->requestAbsoluteUrl($method, $url, $jsonBody, $rawBody, $contentType, $extraHeaders);
     }
 
-    private function requestAbsoluteUrl(string $method, string $url, ?array $jsonBody = null, ?string $rawBody = null, ?string $contentType = null): array
+    private function requestAbsoluteUrl(string $method, string $url, ?array $jsonBody = null, ?string $rawBody = null, ?string $contentType = null, array $extraHeaders = []): array
     {
-        $headers = ['Authorization: Bearer ' . $this->accessToken()];
+        $headers = array_merge(['Authorization: Bearer ' . $this->accessToken()], $extraHeaders);
         $payload = null;
 
         if ($rawBody !== null) {

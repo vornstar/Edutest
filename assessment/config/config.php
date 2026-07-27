@@ -59,8 +59,12 @@ $GLOBALS['__assessment_config'] = [
         'base' => env('GRAPH_API_BASE', 'https://graph.microsoft.com/v1.0'),
     ],
 
+    // A OneDrive/SharePoint folder shared once, manually, with "People in
+    // the organisation with the link can edit" - the same sharing action
+    // any staff member can do from the OneDrive/SharePoint UI, no Azure
+    // Portal or admin consent needed. See services/OneDriveService.php.
     'onedrive' => [
-        'drive_id' => env('ASSESSMENT_ONEDRIVE_DRIVE_ID', ''),
+        'master_folder_link' => env('ASSESSMENT_ONEDRIVE_FOLDER_LINK', ''),
         'root_folder' => rtrim((string) env('ONEDRIVE_ROOT_FOLDER', '/Assessments'), '/'),
     ],
 ];

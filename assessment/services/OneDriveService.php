@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/GraphAppClient.php';
+require_once __DIR__ . '/GraphApiClient.php';
 require_once __DIR__ . '/../config/config.php';
 
 /**
@@ -11,76 +11,131 @@ require_once __DIR__ . '/../config/config.php';
  * controllers/FileProxyController.php so access stays gated by our own
  * RBAC checks (see SRS 5.2 and 6.3).
  *
- * Uses GraphAppClient - an app-only (client-credentials) Graph connection,
- * NOT the signed-in user's own delegated token. This is deliberate: with a
- * delegated token, whoever is currently browsing would need their own
- * Microsoft 365 permission on the storage drive/folder just to view a
- * file (which is exactly the "students need read/write on the Teams
- * folder" problem this replaces), defeating the point of proxying access
- * through this app's own RBAC in the first place. With an app-only token,
- * no student or teacher needs any Microsoft permission on the drive at
- * all - see GraphAppClient.php for the one-time Azure AD admin consent
- * this requires.
+ * Uses the signed-in user's own delegated Graph token (GraphApiClient),
+ * NOT an app-only/Application-permission connection - Files.ReadWrite.All
+ * as an Application permission needs Azure AD admin consent this tenant
+ * has not been able to grant. Instead this mirrors the school's other
+ * OneDrive-integrated module (the DofE application system): a single
+ * folder is shared once, manually, via a normal "anyone in the
+ * organisation with the link can edit" OneDrive/SharePoint sharing link -
+ * no Azure Portal or admin consent involved, just the same folder-sharing
+ * action any staff member can already do. That link is resolved via
+ * Graph's /shares/{id}/driveItem endpoint (redeeming the sharing link) to
+ * get a driveId/itemId, and every file operation happens under that
+ * folder using whichever signed-in user is currently making the request -
+ * their own access comes from being able to see the shared folder at all,
+ * not from any Graph API permission grant.
  */
 final class OneDriveService
 {
-    private GraphAppClient $graph;
+    private GraphApiClient $graph;
 
-    public function __construct()
+    /** @var array<string,array{driveId:string,itemId:string}> */
+    private static array $masterFolderCache = [];
+
+    public function __construct(int $actingUserId)
     {
-        $this->graph = new GraphAppClient();
+        $this->graph = new GraphApiClient($actingUserId);
+    }
+
+    private static function encodeSharingUrl(string $url): string
+    {
+        $base64 = base64_encode($url);
+        $base64 = str_replace(['+', '/'], ['-', '_'], $base64);
+        return 'u!' . rtrim($base64, '=');
     }
 
     /**
-     * Every file lives in one shared drive (a SharePoint document library
-     * or a dedicated shared OneDrive), configured via ONEDRIVE_DRIVE_ID -
-     * there is no per-user drive to fall back to with an app-only token.
+     * Resolves ASSESSMENT_ONEDRIVE_FOLDER_LINK (a plain OneDrive/SharePoint
+     * "anyone in the org with the link can edit" sharing URL) into a
+     * driveId/itemId pair, redeeming it with the current signed-in user's
+     * own token. Cached per request - every file operation resolves the
+     * same master folder.
      */
-    private function driveSegment(): string
+    private function resolveMasterFolder(): array
     {
-        $driveId = config('onedrive.drive_id');
-        if (!$driveId) {
+        $link = (string) config('onedrive.master_folder_link');
+        if ($link === '') {
             throw new RuntimeException(
-                'ONEDRIVE_DRIVE_ID is not configured. The assessment platform needs a shared ' .
-                'drive id (a SharePoint document library or dedicated shared OneDrive) - see ' .
-                'Admin > OneDrive setup, or assessment/config/config.php.'
+                'ASSESSMENT_ONEDRIVE_FOLDER_LINK is not configured. Share a OneDrive/SharePoint ' .
+                'folder with "People in the organisation with the link can edit", copy that link, ' .
+                'and set it in .env.php - see Admin > OneDrive setup for a walkthrough.'
             );
         }
-        return "/drives/{$driveId}";
+
+        if (isset(self::$masterFolderCache[$link])) {
+            return self::$masterFolderCache[$link];
+        }
+
+        $encoded = self::encodeSharingUrl($link);
+        $result = $this->graph->get("/shares/{$encoded}/driveItem", [], ['Prefer: redeemSharingLink']);
+
+        $driveId = $result['remoteItem']['parentReference']['driveId'] ?? ($result['parentReference']['driveId'] ?? null);
+        $itemId = $result['remoteItem']['id'] ?? ($result['id'] ?? null);
+
+        if (!$driveId || !$itemId) {
+            throw new RuntimeException('Could not resolve ASSESSMENT_ONEDRIVE_FOLDER_LINK to a OneDrive folder - check the link is still valid and shared with the whole organisation.');
+        }
+
+        return self::$masterFolderCache[$link] = ['driveId' => $driveId, 'itemId' => $itemId];
     }
 
-    /**
-     * Path-addressed URLs (as opposed to item-id ones) need an explicit
-     * /root segment before the colon - Graph's syntax is
-     * /drives/{drive-id}/root:/{item-path}:/content, not
-     * /drives/{drive-id}:/{item-path}:/content (which 400s with "Resource
-     * not found for the segment 'content'", since Graph never resolves the
-     * colon-path to begin with).
-     */
-    private function pathSegment(string $itemPath): string
+    /** Finds (or creates) a child folder by name under a known parent item, returning its id. */
+    private function ensureFolder(string $driveId, string $parentItemId, string $name): string
     {
-        return $this->driveSegment() . '/root:' . $itemPath;
+        $children = $this->graph->getAll("/drives/{$driveId}/items/{$parentItemId}/children", ['$select' => 'id,name']);
+        foreach ($children as $child) {
+            if (strcasecmp((string) $child['name'], $name) === 0) {
+                return (string) $child['id'];
+            }
+        }
+
+        $created = $this->graph->post("/drives/{$driveId}/items/{$parentItemId}/children", [
+            'name' => $name,
+            'folder' => new stdClass(),
+            '@microsoft.graph.conflictBehavior' => 'rename',
+        ]);
+        return (string) $created['id'];
+    }
+
+    /** Walks/creates a list of nested folder name segments under the master folder, returning the final folder's item id. */
+    private function ensurePath(array $segments): string
+    {
+        $root = $this->resolveMasterFolder();
+        $itemId = $root['itemId'];
+        foreach (array_filter($segments, static fn($s) => $s !== '') as $segment) {
+            $itemId = $this->ensureFolder($root['driveId'], $itemId, $segment);
+        }
+        return $itemId;
+    }
+
+    private function rootFolderSegments(): array
+    {
+        return explode('/', trim((string) config('onedrive.root_folder'), '/'));
     }
 
     /**
-     * Uploads an exam paper or mark scheme PDF into /Assessments/Papers/{paperId}/.
+     * Uploads an exam paper or mark scheme PDF into {root}/Papers/{paperId}/.
      */
     public function uploadPaperPdf(int $paperId, string $filename, string $binaryContent): string
     {
-        $folder = config('onedrive.root_folder') . "/Papers/{$paperId}";
-        $path = $this->pathSegment("{$folder}/{$filename}") . ':/content';
+        $folderId = $this->ensurePath(array_merge($this->rootFolderSegments(), ['Papers', (string) $paperId]));
+        $root = $this->resolveMasterFolder();
+        $path = "/drives/{$root['driveId']}/items/{$folderId}:/" . rawurlencode($filename) . ':/content';
         $result = $this->graph->putBinary($path, $binaryContent, 'application/pdf');
         return (string) $result['id'];
     }
 
     /**
      * Uploads a scanned student script using the required folder convention:
-     * /Assessments/{PaperID}/{StudentID}.pdf
+     * {root}/{PaperID}/{StudentID}.pdf
      */
     public function uploadScannedScript(int $paperId, int $studentId, string $binaryContent, string $extension = 'pdf'): string
     {
-        $folder = config('onedrive.root_folder') . "/{$paperId}";
-        $path = $this->pathSegment("{$folder}/{$studentId}.{$extension}") . ':/content';
+        $folderId = $this->ensurePath(array_merge($this->rootFolderSegments(), [(string) $paperId]));
+        $root = $this->resolveMasterFolder();
+        $filename = "{$studentId}.{$extension}";
+        $path = "/drives/{$root['driveId']}/items/{$folderId}:/" . rawurlencode($filename) . ':/content';
         $contentType = $extension === 'pdf' ? 'application/pdf' : 'image/' . $extension;
         $result = $this->graph->putBinary($path, $binaryContent, $contentType);
         return (string) $result['id'];
@@ -89,17 +144,33 @@ final class OneDriveService
     /** Streams file bytes by drive item id for the backend proxy to relay to the browser. */
     public function downloadById(string $driveItemId): string
     {
-        return $this->graph->getBinary($this->driveSegment() . "/items/{$driveItemId}/content");
+        $root = $this->resolveMasterFolder();
+        return $this->graph->getBinary("/drives/{$root['driveId']}/items/{$driveItemId}/content");
     }
 
     public function metadata(string $driveItemId): array
     {
-        return $this->graph->get($this->driveSegment() . "/items/{$driveItemId}");
+        $root = $this->resolveMasterFolder();
+        return $this->graph->get("/drives/{$root['driveId']}/items/{$driveItemId}");
+    }
+
+    /** Diagnostic for Admin > OneDrive setup: resolves the configured sharing link and reports basic info about it, or throws with the actual Graph error. */
+    public function testMasterFolder(): array
+    {
+        $root = $this->resolveMasterFolder();
+        $meta = $this->graph->get("/drives/{$root['driveId']}/items/{$root['itemId']}", ['$select' => 'name,webUrl']);
+        return [
+            'driveId' => $root['driveId'],
+            'itemId' => $root['itemId'],
+            'name' => $meta['name'] ?? '(unknown)',
+            'webUrl' => $meta['webUrl'] ?? null,
+        ];
     }
 
     /** Writes back an annotated/flattened PDF, replacing the stored version. */
     public function replaceContent(string $driveItemId, string $binaryContent): void
     {
-        $this->graph->putBinary($this->driveSegment() . "/items/{$driveItemId}/content", $binaryContent, 'application/pdf');
+        $root = $this->resolveMasterFolder();
+        $this->graph->putBinary("/drives/{$root['driveId']}/items/{$driveItemId}/content", $binaryContent, 'application/pdf');
     }
 }
