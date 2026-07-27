@@ -17,7 +17,7 @@ require __DIR__ . '/../partials/header.php';
         foreach ($papers as $paper) {
             $pdo = Database::connection();
             $stmt = $pdo->prepare(
-                'SELECT s.*, u.display_name AS student_name, p.title AS paper_title FROM submissions s
+                'SELECT s.*, u.display_name AS student_name, p.title AS paper_title, a.class_id FROM submissions s
                  INNER JOIN test_assignments a ON a.id = s.assignment_id
                  INNER JOIN users u ON u.id = s.student_id
                  INNER JOIN papers p ON p.id = a.paper_id
@@ -30,7 +30,11 @@ require __DIR__ . '/../partials/header.php';
         ?>
         <?php foreach ($rows as $row): ?>
             <tr>
-                <td><?= htmlspecialchars($row['paper_title']) ?></td>
+                <td><?= htmlspecialchars($row['paper_title']) ?>
+                    <?php if ($row['class_id'] === null): ?>
+                        <span class="autosave-status" title="Your own self-test, not a real student">(TEST)</span>
+                    <?php endif; ?>
+                </td>
                 <td><?= htmlspecialchars($row['student_name']) ?></td>
                 <td><?= htmlspecialchars($row['status']) ?></td>
                 <td><?= htmlspecialchars($row['submitted_at'] ?? '—') ?></td>

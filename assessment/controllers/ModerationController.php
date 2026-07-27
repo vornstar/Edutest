@@ -77,10 +77,12 @@ final class ModerationController
         $questions = Question::forPaper((int) $paper['id']);
         $answers = Submission::answers((int) $submission['id']);
 
-        // Blind moderation hides the primary marker's scores/annotations until this review is complete.
+        // Blind moderation hides the primary marker's scores/annotations until this review is complete -
+        // but the student's own work (typed answers, in-PDF annotations) is always visible either way,
+        // since blind moderation is about not seeing the PRIMARY MARKER's judgement early, not the student's own script.
         $showPrimary = $moderation['mode'] === 'open' || $moderation['status'] !== 'pending';
         $primaryMarks = $showPrimary ? Mark::latestForSubmission((int) $submission['id'], 'primary') : [];
-        $annotations = $showPrimary ? Annotation::forSubmission((int) $submission['id']) : [];
+        $annotations = Annotation::forSubmission((int) $submission['id']);
 
         $markSchemes = [];
         foreach ($questions as $q) {

@@ -63,4 +63,32 @@ final class TestAssignment
         $stmt->execute(['class_id' => $classId]);
         return $stmt->fetchAll();
     }
+
+    /**
+     * A "self-test" is a real assignment/submission pair a teacher-portal
+     * user creates against their own account, purely so they can try the
+     * whole real student flow (typing, autosave, submitting) - and then
+     * mark/moderate it - before any real student sees the paper. Marked by
+     * class_id IS NULL (a real assignment always has a class), scoped to
+     * whoever created it.
+     */
+    public static function findSelfTest(int $paperId, int $userId): ?array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT * FROM test_assignments WHERE paper_id = :paper_id AND class_id IS NULL AND assigned_by = :assigned_by LIMIT 1'
+        );
+        $stmt->execute(['paper_id' => $paperId, 'assigned_by' => $userId]);
+        return $stmt->fetch() ?: null;
+    }
+
+    public static function isSelfTest(array $assignment): bool
+    {
+        return $assignment['class_id'] === null;
+    }
+
+    public static function delete(int $id): void
+    {
+        $stmt = Database::connection()->prepare('DELETE FROM test_assignments WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+    }
 }

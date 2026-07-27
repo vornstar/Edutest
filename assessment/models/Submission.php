@@ -21,6 +21,14 @@ final class Submission
         return $stmt->fetch();
     }
 
+    /** Read-only lookup - unlike startOrGet(), never creates a row, so safe to call from a GET request. */
+    public static function findByAssignmentAndStudent(int $assignmentId, int $studentId): ?array
+    {
+        $stmt = Database::connection()->prepare('SELECT * FROM submissions WHERE assignment_id = :assignment_id AND student_id = :student_id');
+        $stmt->execute(['assignment_id' => $assignmentId, 'student_id' => $studentId]);
+        return $stmt->fetch() ?: null;
+    }
+
     public static function find(int $id): ?array
     {
         $stmt = Database::connection()->prepare('SELECT * FROM submissions WHERE id = :id');

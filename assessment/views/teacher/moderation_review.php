@@ -7,34 +7,88 @@
 /** @var bool $showPrimary */
 /** @var array $primaryMarks */
 /** @var array $markSchemes */
+/** @var array $annotations */
 $__title = 'Moderation review';
 require __DIR__ . '/../partials/header.php';
 ?>
-<div class="panel">
+<div class="panel marking-panel" data-submission-id="<?= (int) $submission['id'] ?>" data-csrf="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
     <h1><?= htmlspecialchars($paper['title']) ?> &mdash; <?= htmlspecialchars(ucfirst($moderation['mode'])) ?> moderation</h1>
     <?php if (!$showPrimary): ?>
-        <p><em>Blind moderation: the primary marker's scores are hidden until you submit your own.</em></p>
+        <p><em>Blind moderation: the primary marker's scores are hidden until you submit your own. The student's own script/answers are always visible.</em></p>
     <?php endif; ?>
 
-    <form method="post" action="/assessment/teacher/moderation/review/<?= (int) $moderation['id'] ?>">
-        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
-
-        <?php foreach ($questions as $q): $qid = (int) $q['id']; ?>
-            <fieldset class="question-block">
-                <legend><?= htmlspecialchars($q['section'] ?? '') ?> (max <?= htmlspecialchars((string) $q['max_marks']) ?>)</legend>
-                <?php if ($paper['type'] === 'digital'): ?>
-                    <p><strong>Answer:</strong> <?= nl2br(htmlspecialchars($answers[$qid]['answer_text'] ?? '')) ?></p>
+    <div class="mark-split">
+        <?php if ($paper['type'] === 'pdf'): ?>
+        <div class="script-pane">
+            <p class="autosave-status">The student's own typing/writing on the PDF (if any) shows read-only in blue-ish tones on top - your marks go underneath, in whatever colour you pick below.</p>
+            <div class="annotation-stack">
+                <?php if ($submission['scan_drive_item_id']): ?>
+                    <canvas id="annotation-canvas" class="annotation-canvas" data-pdf-src="/assessment/files/scans/<?= (int) $submission['id'] ?>"></canvas>
+                <?php else: ?>
+                    <canvas id="annotation-canvas" class="annotation-canvas" data-pdf-src="/assessment/files/papers/<?= (int) $paper['id'] ?>/paper"></canvas>
                 <?php endif; ?>
-                <p class="mark-scheme"><strong>Mark scheme:</strong> <?= nl2br(htmlspecialchars($markSchemes[$qid] ?? 'Not provided')) ?></p>
-                <?php if ($showPrimary && isset($primaryMarks[$qid])): ?>
-                    <p><strong>Primary marker score:</strong> <?= htmlspecialchars((string) $primaryMarks[$qid]['score']) ?> &mdash; <?= htmlspecialchars($primaryMarks[$qid]['comment'] ?? '') ?></p>
-                <?php endif; ?>
-                <label>Your score <input type="number" step="0.5" min="0" max="<?= htmlspecialchars((string) $q['max_marks']) ?>" name="scores[<?= $qid ?>]"></label>
-                <label>Comment <textarea name="comments[<?= $qid ?>]" rows="2"></textarea></label>
-            </fieldset>
-        <?php endforeach; ?>
+                <canvas id="annotation-student-layer" class="annotation-canvas annotation-student-layer"></canvas>
+            </div>
+            <div class="annotation-tools">
+                <button type="button" data-tool="pen">Pen</button>
+                <button type="button" data-tool="highlighter">Highlighter</button>
+                <button type="button" data-tool="text">Text</button>
+                <input type="color" data-tool="color" value="#059669">
+                <button type="button" id="save-annotation">Save annotations</button>
+                <button type="button" data-page-prev>&larr; Prev</button>
+                <span data-page-indicator>Page 1</span>
+                <button type="button" data-page-next>Next &rarr;</button>
+            </div>
+        </div>
+        <?php endif; ?>
 
-        <button type="submit" class="btn btn-primary">Submit moderation</button>
-    </form>
+        <div class="mark-pane">
+            <form method="post" action="/assessment/teacher/moderation/review/<?= (int) $moderation['id'] ?>">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
+
+                <?php foreach ($questions as $q): $qid = (int) $q['id']; ?>
+                    <fieldset class="question-block">
+                        <legend><?= htmlspecialchars($q['section'] ?? '') ?> (max <?= htmlspecialchars((string) $q['max_marks']) ?>)</legend>
+                        <?php if ($paper['type'] === 'digital'): ?>
+                            <p><strong>Answer:</strong> <?= nl2br(htmlspecialchars($answers[$qid]['answer_text'] ?? '')) ?></p>
+                        <?php endif; ?>
+                        <p class="mark-scheme"><strong>Mark scheme:</strong> <?= nl2br(htmlspecialchars($markSchemes[$qid] ?? 'Not provided')) ?></p>
+                        <?php if ($showPrimary && isset($primaryMarks[$qid])): ?>
+                            <p><strong>Primary marker score:</strong> <?= htmlspecialchars((string) $primaryMarks[$qid]['score']) ?> &mdash; <?= htmlspecialchars($primaryMarks[$qid]['comment'] ?? '') ?></p>
+                        <?php endif; ?>
+                        <label>Your score <input type="number" step="0.5" min="0" max="<?= htmlspecialchars((string) $q['max_marks']) ?>" name="scores[<?= $qid ?>]"></label>
+                        <label>Comment <textarea name="comments[<?= $qid ?>]" rows="2"></textarea></label>
+                    </fieldset>
+                <?php endforeach; ?>
+
+                <button type="submit" class="btn btn-primary">Submit moderation</button>
+            </form>
+        </div>
+    </div>
 </div>
+<?php if ($paper['type'] === 'pdf'): ?>
+<script>
+window.__existingAnnotations = <?php
+    $byPage = [];
+    foreach ($annotations as $a) {
+        if ((int) $a['marker_id'] === (int) AuthController::currentUser()['id']) {
+            $byPage[(int) $a['page_number']] = json_decode($a['data_json'], true);
+        }
+    }
+    echo json_encode($byPage);
+?>;
+window.__studentAnnotations = <?php
+    $studentByPage = [];
+    foreach ($annotations as $a) {
+        if ((int) $a['marker_id'] === (int) $submission['student_id']) {
+            $studentByPage[(int) $a['page_number']] = json_decode($a['data_json'], true);
+        }
+    }
+    echo json_encode($studentByPage);
+?>;
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+<script src="/assessment/assets/js/pdf-annotate-core.js"></script>
+<script src="/assessment/assets/js/canvas-annotate.js"></script>
+<?php endif; ?>
 <?php require __DIR__ . '/../partials/footer.php'; ?>

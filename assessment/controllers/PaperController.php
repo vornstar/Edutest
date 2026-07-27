@@ -5,6 +5,8 @@ require_once __DIR__ . '/AuthController.php';
 require_once __DIR__ . '/../models/Paper.php';
 require_once __DIR__ . '/../models/Question.php';
 require_once __DIR__ . '/../models/User.php';
+require_once __DIR__ . '/../models/TestAssignment.php';
+require_once __DIR__ . '/../models/Submission.php';
 require_once __DIR__ . '/../services/OneDriveService.php';
 
 /**
@@ -119,6 +121,8 @@ final class PaperController
         $paper = self::requireManageable($paperId, $user);
         $questions = Question::forPaper($paperId);
         $canDelete = !Paper::hasSubmissions($paperId);
+        $selfTest = TestAssignment::findSelfTest($paperId, (int) $user['id']);
+        $selfTestSubmission = $selfTest ? Submission::findByAssignmentAndStudent((int) $selfTest['id'], (int) $user['id']) : null;
         require __DIR__ . '/../views/teacher/paper_show.php';
     }
 
@@ -273,6 +277,42 @@ final class PaperController
 
         Paper::delete($paperId);
         header('Location: /assessment/teacher/papers');
+        exit;
+    }
+
+    /**
+     * Starts (or resumes) a self-test: a real assignment/submission the
+     * teacher takes as if they were a student, so autosave/PDF typing/
+     * submit/marking can all be tried for real before any student sees
+     * the paper - see TestController::takeSelfTest().
+     */
+    public static function startTest(int $paperId): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        AuthController::verifyCsrf();
+        self::requireManageable($paperId, $user);
+
+        $assignment = TestAssignment::findSelfTest($paperId, (int) $user['id']);
+        $assignmentId = $assignment ? (int) $assignment['id'] : TestAssignment::create($paperId, null, (int) $user['id'], null, false);
+        Submission::startOrGet($assignmentId, (int) $user['id']);
+
+        header('Location: /assessment/teacher/self-test/' . $assignmentId);
+        exit;
+    }
+
+    /** Deletes a paper's self-test assignment/submission (and everything under it) so testing can be repeated from scratch, or cleaned up before real use. */
+    public static function deleteTest(int $paperId): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        AuthController::verifyCsrf();
+        self::requireManageable($paperId, $user);
+
+        $assignment = TestAssignment::findSelfTest($paperId, (int) $user['id']);
+        if ($assignment) {
+            TestAssignment::delete((int) $assignment['id']);
+        }
+
+        header('Location: /assessment/teacher/papers/' . $paperId);
         exit;
     }
 }

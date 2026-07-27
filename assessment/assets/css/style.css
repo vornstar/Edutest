@@ -96,8 +96,24 @@ input[type="file"], select, textarea {
 .pdf-frame { width: 100%; height: 70vh; border: 1px solid var(--color-border); border-radius: 6px; }
 
 .annotation-canvas { max-width: 100%; border: 1px solid var(--color-border); border-radius: 6px; }
-.annotation-tools { display: flex; gap: 0.5rem; margin-top: 0.5rem; align-items: center; }
-.annotation-tools button, .annotation-tools input { padding: 0.4rem 0.6rem; }
+.annotation-tools, .pdf-answer-tools { display: flex; gap: 0.5rem; margin-top: 0.5rem; align-items: center; flex-wrap: wrap; }
+.annotation-tools button, .annotation-tools input,
+.pdf-answer-tools button, .pdf-answer-tools input { padding: 0.4rem 0.6rem; }
+.annotation-tools button:disabled, .pdf-answer-tools button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Stacks the read-only "what the student did" layer directly on top of the
+   marker's own interactive canvas (which itself has the PDF as its
+   background image) - pointer-events:none on the top layer lets every
+   click/drag pass straight through to the canvas underneath. */
+.annotation-stack { position: relative; max-width: 100%; }
+.annotation-stack .annotation-canvas { display: block; }
+.annotation-student-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    border-color: transparent;
+}
 
 .alert { color: var(--color-danger); font-weight: 600; }
 

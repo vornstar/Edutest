@@ -62,6 +62,7 @@ $routes = [
     ['POST', '/student/submissions/{id}/autosave', [TestController::class, 'autosave']],
     ['POST', '/student/submissions/{id}/submit', [TestController::class, 'submit']],
     ['POST', '/student/submissions/{id}/scan', [TestController::class, 'uploadScan']],
+    ['POST', '/student/submissions/{id}/annotation', [TestController::class, 'saveAnnotation']],
     ['GET', '/student/submissions/{id}/self-mark', [TestController::class, 'selfMarkForm']],
     ['POST', '/student/submissions/{id}/self-mark', [TestController::class, 'selfMarkSubmit']],
     ['GET', '/student/submissions/{id}', [StudentController::class, 'submissionSummary']],
@@ -78,6 +79,9 @@ $routes = [
     ['POST', '/teacher/papers/{id}/update-pdf', [PaperController::class, 'updatePdf']],
     ['POST', '/teacher/papers/{id}/delete', [PaperController::class, 'destroy']],
     ['GET', '/teacher/papers/{id}/preview', [TestController::class, 'preview']],
+    ['POST', '/teacher/papers/{id}/start-test', [PaperController::class, 'startTest']],
+    ['POST', '/teacher/papers/{id}/delete-test', [PaperController::class, 'deleteTest']],
+    ['GET', '/teacher/self-test/{id}', [TestController::class, 'takeSelfTest']],
     ['GET', '/teacher/papers/{id}/assign', [TestController::class, 'assignForm']],
     ['POST', '/teacher/papers/{id}/assign', [TestController::class, 'assign']],
 

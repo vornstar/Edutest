@@ -2,6 +2,8 @@
 /** @var array $paper */
 /** @var array $questions */
 /** @var bool $canDelete */
+/** @var array|null $selfTest */
+/** @var array|null $selfTestSubmission */
 $__title = htmlspecialchars($paper['title']);
 require __DIR__ . '/../partials/header.php';
 ?>
@@ -30,6 +32,28 @@ require __DIR__ . '/../partials/header.php';
 
     <p>Type: <?= htmlspecialchars($paper['type']) ?> &middot; Status: <?= htmlspecialchars($paper['status']) ?>
         &middot; Self-marking: <?= $paper['self_marking_enabled'] ? 'Enabled' : 'Disabled' ?></p>
+
+    <div class="question-block">
+        <h2 style="margin-top:0">Test this paper before assigning it</h2>
+        <p>Take the paper yourself exactly as a student would - typing/writing included - then go mark or moderate your own attempt. Nothing here is visible to students or counted in any report; it's just for you.</p>
+        <?php if (!$selfTestSubmission): ?>
+            <form method="post" action="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/start-test" style="display:inline">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
+                <button type="submit" class="btn btn-primary">Start test</button>
+            </form>
+        <?php else: ?>
+            <a class="btn btn-primary" href="/assessment/teacher/self-test/<?= (int) $selfTest['id'] ?>">
+                <?= $selfTestSubmission['status'] === 'in_progress' ? 'Continue test' : 'View your test answers' ?>
+            </a>
+            <?php if ($selfTestSubmission['status'] !== 'in_progress'): ?>
+                <a class="btn" href="/assessment/teacher/marking/<?= (int) $selfTestSubmission['id'] ?>">Mark your test submission</a>
+            <?php endif; ?>
+            <form method="post" action="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/delete-test" style="display:inline" onsubmit="return confirm('Delete your test submission so you can start over?');">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
+                <button type="submit" class="btn">Delete test &amp; start over</button>
+            </form>
+        <?php endif; ?>
+    </div>
 
     <?php if ($paper['type'] === 'pdf'): ?>
         <p>

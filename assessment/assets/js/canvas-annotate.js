@@ -1,95 +1,108 @@
 /**
- * Split-screen marking canvas: renders page 1 of the student's PDF/scan
- * with PDF.js, then layers a Fabric.js canvas on top for freehand ink,
- * highlighter strokes, and text-box annotations. The vector overlay is
- * saved as JSON (not flattened into the PDF) so it can be re-edited later.
+ * Split-screen marking canvas: renders the student's PDF/scan page by page
+ * with PDF.js, shows the student's own in-PDF typing (if any - see
+ * student-pdf-annotate.js) as a read-only reference layer on top of the
+ * page, and layers an interactive Fabric.js canvas underneath that for the
+ * marker's own freehand ink, highlighter strokes, and text-box comments.
+ * The two layers are saved completely separately (different marker_id
+ * rows in the same annotations table), so marking never overwrites what a
+ * student wrote.
  */
 (function () {
     'use strict';
 
     var canvasEl = document.getElementById('annotation-canvas');
-    if (!canvasEl || typeof fabric === 'undefined') return;
+    var studentLayerEl = document.getElementById('annotation-student-layer');
+    if (!canvasEl || typeof fabric === 'undefined' || !window.PdfAnnotateCore) return;
 
     var panel = document.querySelector('.marking-panel');
     var submissionId = panel.dataset.submissionId;
     var csrfToken = panel.dataset.csrf;
-    var currentPage = 1;
+    var pagination = null;
+    var fabricCanvas = null;
+    var studentStaticCanvas = null;
 
-    var pdfjsScript = document.createElement('script');
-    pdfjsScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-    pdfjsScript.onload = initViewer;
-    document.head.appendChild(pdfjsScript);
+    PdfAnnotateCore.loadDocument(canvasEl.dataset.pdfSrc).then(function (pdfDoc) {
+        pagination = PdfAnnotateCore.wirePagination(
+            document.querySelector('.annotation-tools'),
+            pdfDoc.numPages,
+            function (pageNumber) { renderPage(pdfDoc, pageNumber); }
+        );
+        pagination.setPage(1);
+    }).catch(function (err) {
+        console.error('Failed to render PDF for annotation', err);
+    });
 
-    function initViewer() {
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    function renderPage(pdfDoc, pageNumber) {
+        if (fabricCanvas) fabricCanvas.dispose();
+        if (studentStaticCanvas) studentStaticCanvas.dispose();
 
-        window.pdfjsLib.getDocument(canvasEl.dataset.pdfSrc).promise.then(function (pdf) {
-            return pdf.getPage(currentPage);
-        }).then(function (page) {
-            var viewport = page.getViewport({ scale: 1.4 });
-            canvasEl.width = viewport.width;
-            canvasEl.height = viewport.height;
+        PdfAnnotateCore.renderPageToImage(pdfDoc, pageNumber, 1.4).then(function (rendered) {
+            canvasEl.width = rendered.width;
+            canvasEl.height = rendered.height;
 
-            var renderCanvas = document.createElement('canvas');
-            renderCanvas.width = viewport.width;
-            renderCanvas.height = viewport.height;
-            var ctx = renderCanvas.getContext('2d');
-
-            page.render({ canvasContext: ctx, viewport: viewport }).promise.then(function () {
-                var fabricCanvas = new fabric.Canvas(canvasEl, { isDrawingMode: true });
-                fabric.Image.fromURL(renderCanvas.toDataURL(), function (img) {
-                    fabricCanvas.setBackgroundImage(img, fabricCanvas.renderAll.bind(fabricCanvas));
-                });
-                fabricCanvas.freeDrawingBrush.width = 3;
-                fabricCanvas.freeDrawingBrush.color = '#e11d48';
-
-                wireTools(fabricCanvas);
-                loadExistingAnnotation(fabricCanvas);
+            fabricCanvas = new fabric.Canvas(canvasEl, { isDrawingMode: true });
+            fabric.Image.fromURL(rendered.dataUrl, function (img) {
+                fabricCanvas.setBackgroundImage(img, fabricCanvas.renderAll.bind(fabricCanvas));
             });
-        }).catch(function (err) {
-            console.error('Failed to render PDF for annotation', err);
+            fabricCanvas.freeDrawingBrush.width = 3;
+            fabricCanvas.freeDrawingBrush.color = currentColor();
+
+            wireTools();
+            loadOwnAnnotation(pageNumber);
+            renderStudentLayer(pageNumber, rendered.width, rendered.height);
         });
     }
 
-    function wireTools(fabricCanvas) {
+    /** A non-interactive canvas stacked on top showing what the student typed/drew - pointer-events:none (set in CSS) lets clicks fall through to the marker's own canvas below. */
+    function renderStudentLayer(pageNumber, width, height) {
+        if (!studentLayerEl) return;
+        studentLayerEl.width = width;
+        studentLayerEl.height = height;
+        studentStaticCanvas = new fabric.StaticCanvas(studentLayerEl);
+
+        var studentJson = window.__studentAnnotations && window.__studentAnnotations[pageNumber];
+        if (studentJson) {
+            studentStaticCanvas.loadFromJSON(studentJson, studentStaticCanvas.renderAll.bind(studentStaticCanvas));
+        }
+    }
+
+    function wireTools() {
         document.querySelectorAll('[data-tool]').forEach(function (btn) {
-            btn.addEventListener('click', function () {
+            btn.onclick = function () {
                 var tool = btn.dataset.tool;
                 if (tool === 'pen') {
                     fabricCanvas.isDrawingMode = true;
                     fabricCanvas.freeDrawingBrush.width = 3;
-                    fabricCanvas.freeDrawingBrush.color = currentColor(fabricCanvas);
+                    fabricCanvas.freeDrawingBrush.color = currentColor();
                 } else if (tool === 'highlighter') {
                     fabricCanvas.isDrawingMode = true;
                     fabricCanvas.freeDrawingBrush.width = 16;
-                    fabricCanvas.freeDrawingBrush.color = hexToRgba(currentColor(fabricCanvas), 0.35);
+                    fabricCanvas.freeDrawingBrush.color = hexToRgba(currentColor(), 0.35);
                 } else if (tool === 'text') {
                     fabricCanvas.isDrawingMode = false;
                     var text = new fabric.IText('Comment', {
-                        left: 40, top: 40, fill: currentColor(fabricCanvas), fontSize: 18,
+                        left: 40, top: 40, fill: currentColor(), fontSize: 18,
                     });
                     fabricCanvas.add(text);
                 }
-            });
+            };
         });
 
         var colorInput = document.querySelector('[data-tool="color"]');
         if (colorInput) {
-            colorInput.addEventListener('input', function () {
+            colorInput.oninput = function () {
                 fabricCanvas.freeDrawingBrush.color = colorInput.value;
-            });
+            };
         }
 
         var saveBtn = document.getElementById('save-annotation');
         if (saveBtn) {
-            saveBtn.addEventListener('click', function () {
-                saveAnnotation(fabricCanvas);
-            });
+            saveBtn.onclick = function () { saveAnnotation(); };
         }
     }
 
-    function currentColor(fabricCanvas) {
+    function currentColor() {
         var input = document.querySelector('[data-tool="color"]');
         return input ? input.value : '#e11d48';
     }
@@ -101,19 +114,19 @@
         return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
     }
 
-    function loadExistingAnnotation(fabricCanvas) {
-        var existing = window.__existingAnnotations && window.__existingAnnotations[currentPage];
+    function loadOwnAnnotation(pageNumber) {
+        var existing = window.__existingAnnotations && window.__existingAnnotations[pageNumber];
         if (existing) {
             fabricCanvas.loadFromJSON(existing, fabricCanvas.renderAll.bind(fabricCanvas));
         }
     }
 
-    function saveAnnotation(fabricCanvas) {
+    function saveAnnotation() {
         fetch('/assessment/teacher/marking/' + submissionId + '/annotation', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                page: currentPage,
+                page: pagination.getPage(),
                 fabric_json: fabricCanvas.toJSON(),
                 csrf_token: csrfToken,
             }),

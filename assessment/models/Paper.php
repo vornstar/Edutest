@@ -98,13 +98,19 @@ final class Paper
         $stmt->execute(['item_id' => $driveItemId, 'id' => $paperId]);
     }
 
-    /** Whether any student has started/submitted work against this paper - used to block accidental deletion of real work. */
+    /**
+     * Whether any REAL student has started/submitted work against this
+     * paper - used to block accidental deletion of real work. Excludes
+     * self-test submissions (class_id IS NULL, see
+     * TestAssignment::findSelfTest) - a teacher trying out their own paper
+     * shouldn't block themselves from deleting/editing a still-draft paper.
+     */
     public static function hasSubmissions(int $paperId): bool
     {
         $stmt = Database::connection()->prepare(
             'SELECT 1 FROM submissions s
              INNER JOIN test_assignments a ON a.id = s.assignment_id
-             WHERE a.paper_id = :paper_id LIMIT 1'
+             WHERE a.paper_id = :paper_id AND a.class_id IS NOT NULL LIMIT 1'
         );
         $stmt->execute(['paper_id' => $paperId]);
         return (bool) $stmt->fetchColumn();

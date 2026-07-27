@@ -8,6 +8,7 @@ require_once __DIR__ . '/../models/Question.php';
 require_once __DIR__ . '/../models/ClassRoster.php';
 require_once __DIR__ . '/../models/TestAssignment.php';
 require_once __DIR__ . '/../models/Submission.php';
+require_once __DIR__ . '/../models/Annotation.php';
 require_once __DIR__ . '/../models/User.php';
 require_once __DIR__ . '/../services/TeamsService.php';
 require_once __DIR__ . '/../services/OneDriveService.php';
@@ -37,6 +38,66 @@ final class TestController
         } else {
             require __DIR__ . '/../views/student/take_pdf.php';
         }
+    }
+
+    /**
+     * Starts (or resumes) a teacher-portal user's own self-test - the real
+     * take_digital/take_pdf flow, fully interactive, against a real
+     * submission only they can ever see. Created via
+     * PaperController::startTest(). Distinct from preview() (which never
+     * creates a submission and is read-only) - this is for actually trying
+     * typing, autosave, and submitting before any real student does.
+     */
+    public static function takeSelfTest(int $assignmentId): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        $assignment = TestAssignment::find($assignmentId);
+        if (!$assignment || !TestAssignment::isSelfTest($assignment) || (int) $assignment['assigned_by'] !== (int) $user['id']) {
+            http_response_code(404);
+            exit;
+        }
+
+        $paper = Paper::find((int) $assignment['paper_id']);
+        $submission = Submission::startOrGet($assignmentId, (int) $user['id']);
+        $questions = Question::forPaper((int) $paper['id']);
+        $answers = Submission::answers((int) $submission['id']);
+
+        if ($paper['type'] === 'digital') {
+            require __DIR__ . '/../views/student/take_digital.php';
+        } else {
+            require __DIR__ . '/../views/student/take_pdf.php';
+        }
+    }
+
+    /**
+     * Authorizes access to a submission's own student-facing actions
+     * (autosave, submit, scan upload, in-PDF annotation): either the real
+     * student it belongs to, or - for a self-test - the teacher-portal
+     * user who created it, so the whole real flow can be tried end to end
+     * without needing an actual student account.
+     */
+    private static function authorizeSubmissionOwner(int $submissionId): array
+    {
+        $user = AuthController::requireLogin();
+        $submission = Submission::find($submissionId);
+        if (!$submission || (int) $submission['student_id'] !== (int) $user['id']) {
+            http_response_code(404);
+            exit;
+        }
+
+        if ($user['role'] === User::ROLE_STUDENT) {
+            return [$user, $submission];
+        }
+
+        if (in_array($user['role'], User::TEACHER_PORTAL_ROLES, true)) {
+            $assignment = TestAssignment::find((int) $submission['assignment_id']);
+            if ($assignment && TestAssignment::isSelfTest($assignment) && (int) $assignment['assigned_by'] === (int) $user['id']) {
+                return [$user, $submission];
+            }
+        }
+
+        http_response_code(404);
+        exit;
     }
 
     // --- Teacher: assign a paper to a class, optionally pushing to Teams ---
@@ -112,12 +173,7 @@ final class TestController
 
     public static function autosave(int $submissionId): void
     {
-        $user = AuthController::requireRole([User::ROLE_STUDENT]);
-        $submission = Submission::find($submissionId);
-        if (!$submission || (int) $submission['student_id'] !== (int) $user['id']) {
-            http_response_code(404);
-            exit;
-        }
+        [$user, $submission] = self::authorizeSubmissionOwner($submissionId);
         if ($submission['status'] !== 'in_progress') {
             http_response_code(409);
             echo json_encode(['error' => 'Submission already finalized.']);
@@ -137,32 +193,58 @@ final class TestController
         echo json_encode(['saved' => true, 'at' => date('c')]);
     }
 
-    public static function submit(int $submissionId): void
+    /**
+     * Saves one page's worth of in-PDF typing/drawing as Fabric.js JSON -
+     * this is the "type directly on the PDF" answer mechanism for PDF-mode
+     * papers, an alternative to the plain-text answer booklet. Stored via
+     * the same Annotation model teacher marking uses, keyed by the
+     * student's own user id as marker_id, so it's a clean separate layer
+     * from any teacher/moderator annotation on the same submission.
+     */
+    public static function saveAnnotation(int $submissionId): void
     {
-        $user = AuthController::requireRole([User::ROLE_STUDENT]);
-        AuthController::verifyCsrf();
-
-        $submission = Submission::find($submissionId);
-        if (!$submission || (int) $submission['student_id'] !== (int) $user['id']) {
-            http_response_code(404);
+        [$user, $submission] = self::authorizeSubmissionOwner($submissionId);
+        if ($submission['status'] !== 'in_progress') {
+            http_response_code(409);
+            echo json_encode(['error' => 'Submission already finalized.']);
             exit;
         }
+
+        $input = json_decode(file_get_contents('php://input'), true) ?? [];
+        AuthController::bootSession();
+        if (!hash_equals($_SESSION['csrf_token'] ?? '', (string) ($input['csrf_token'] ?? ''))) {
+            http_response_code(419);
+            echo json_encode(['error' => 'Invalid form token.']);
+            exit;
+        }
+
+        Annotation::save($submissionId, (int) ($input['page'] ?? 1), (int) $user['id'], (array) ($input['fabric_json'] ?? []));
+        header('Content-Type: application/json');
+        echo json_encode(['saved' => true, 'at' => date('c')]);
+    }
+
+    public static function submit(int $submissionId): void
+    {
+        AuthController::verifyCsrf();
+        [$user, $submission] = self::authorizeSubmissionOwner($submissionId);
+
         Submission::submit($submissionId);
-        header('Location: /assessment/student/submissions/' . $submissionId);
+
+        if ($user['role'] === User::ROLE_STUDENT) {
+            header('Location: /assessment/student/submissions/' . $submissionId);
+        } else {
+            // Self-test: go straight to marking so the whole flow - type, submit, mark - can be tried in one sitting.
+            header('Location: /assessment/teacher/marking/' . $submissionId);
+        }
         exit;
     }
 
     /** Upload a scanned handwritten script for a PDF-mode assignment. */
     public static function uploadScan(int $submissionId): void
     {
-        $user = AuthController::requireRole([User::ROLE_STUDENT]);
         AuthController::verifyCsrf();
+        [$user, $submission] = self::authorizeSubmissionOwner($submissionId);
 
-        $submission = Submission::find($submissionId);
-        if (!$submission || (int) $submission['student_id'] !== (int) $user['id']) {
-            http_response_code(404);
-            exit;
-        }
         if (empty($_FILES['scan']['tmp_name']) || !is_uploaded_file($_FILES['scan']['tmp_name'])) {
             http_response_code(422);
             echo 'No file uploaded.';
@@ -177,7 +259,11 @@ final class TestController
         $itemId = $drive->uploadScannedScript((int) $assignment['paper_id'], (int) $user['id'], $content, strtolower($ext));
 
         Submission::attachScan($submissionId, $itemId);
-        header('Location: /assessment/student/submissions/' . $submissionId);
+        if ($user['role'] === User::ROLE_STUDENT) {
+            header('Location: /assessment/student/submissions/' . $submissionId);
+        } else {
+            header('Location: /assessment/teacher/marking/' . $submissionId);
+        }
         exit;
     }
 

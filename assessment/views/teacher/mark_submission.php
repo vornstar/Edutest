@@ -17,17 +17,24 @@ require __DIR__ . '/../partials/header.php';
     <div class="mark-split">
         <div class="script-pane">
             <?php if ($paper['type'] === 'pdf'): ?>
-                <?php if ($submission['scan_drive_item_id']): ?>
-                    <canvas id="annotation-canvas" class="annotation-canvas" data-pdf-src="/assessment/files/scans/<?= (int) $submission['id'] ?>"></canvas>
-                <?php else: ?>
-                    <canvas id="annotation-canvas" class="annotation-canvas" data-pdf-src="/assessment/files/papers/<?= (int) $paper['id'] ?>/paper"></canvas>
-                <?php endif; ?>
+                <p class="autosave-status">The student's own typing/writing on the PDF (if any) shows read-only in blue-ish tones on top - your marks go underneath, in whatever colour you pick below.</p>
+                <div class="annotation-stack">
+                    <?php if ($submission['scan_drive_item_id']): ?>
+                        <canvas id="annotation-canvas" class="annotation-canvas" data-pdf-src="/assessment/files/scans/<?= (int) $submission['id'] ?>"></canvas>
+                    <?php else: ?>
+                        <canvas id="annotation-canvas" class="annotation-canvas" data-pdf-src="/assessment/files/papers/<?= (int) $paper['id'] ?>/paper"></canvas>
+                    <?php endif; ?>
+                    <canvas id="annotation-student-layer" class="annotation-canvas annotation-student-layer"></canvas>
+                </div>
                 <div class="annotation-tools">
                     <button type="button" data-tool="pen">Pen</button>
                     <button type="button" data-tool="highlighter">Highlighter</button>
                     <button type="button" data-tool="text">Text</button>
                     <input type="color" data-tool="color" value="#e11d48">
                     <button type="button" id="save-annotation">Save annotations</button>
+                    <button type="button" data-page-prev>&larr; Prev</button>
+                    <span data-page-indicator>Page 1</span>
+                    <button type="button" data-page-next>Next &rarr;</button>
                 </div>
             <?php else: ?>
                 <p>Digital submission &mdash; see typed answers alongside each question below.</p>
@@ -79,7 +86,17 @@ window.__existingAnnotations = <?php
     }
     echo json_encode($byPage);
 ?>;
+window.__studentAnnotations = <?php
+    $studentByPage = [];
+    foreach ($annotations as $a) {
+        if ((int) $a['marker_id'] === (int) $submission['student_id']) {
+            $studentByPage[(int) $a['page_number']] = json_decode($a['data_json'], true);
+        }
+    }
+    echo json_encode($studentByPage);
+?>;
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+<script src="/assessment/assets/js/pdf-annotate-core.js"></script>
 <script src="/assessment/assets/js/canvas-annotate.js"></script>
 <?php require __DIR__ . '/../partials/footer.php'; ?>
