@@ -19,7 +19,10 @@ define('ASSESSMENT_CONFIG_LOADED', true);
 
 define('ASSESSMENT_ROOT', dirname(__DIR__));
 
-require_once ASSESSMENT_ROOT . '/includes/secrets.php';
+// includes/secrets.php lives at the SITE root (alongside index.php/
+// auth_handler.php), one level above the assessment app's own folder -
+// i.e. two levels up from this file (assessment/config/config.php).
+require_once dirname(__DIR__, 2) . '/includes/secrets.php';
 
 function env(string $key, ?string $default = null): ?string
 {
