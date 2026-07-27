@@ -65,9 +65,10 @@
             fabricCanvas.freeDrawingBrush.width = 3;
             fabricCanvas.freeDrawingBrush.color = currentColor();
             fabricCanvas.on('mouse:down', function (opt) {
-                if (!placingText) return;
-                placingText = false;
-                canvasEl.style.cursor = '';
+                // Stays armed after placing one text box, so the next click
+                // starts another without re-clicking "Text" - but a click
+                // that lands ON an existing box edits/selects it instead.
+                if (!placingText || opt.target) return;
                 var pointer = fabricCanvas.getPointer(opt.e);
                 var text = new fabric.IText('Comment', {
                     left: pointer.x, top: pointer.y, fill: currentColor(), fontSize: 18,

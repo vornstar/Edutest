@@ -20,6 +20,8 @@ require __DIR__ . '/../partials/header.php';
         <div id="pdf-fields" hidden>
             <label>Exam paper PDF <input type="file" name="paper_pdf" accept="application/pdf"></label>
             <label>Mark scheme PDF <input type="file" name="mark_scheme_pdf" accept="application/pdf"></label>
+            <label>Max marks <input type="number" step="0.5" min="0" name="max_marks"></label>
+            <p class="autosave-status">PDF papers don't need a question-by-question breakdown - students type/write directly on the PDF, and you enter one overall score out of this when marking.</p>
         </div>
 
         <button type="submit" class="btn btn-primary">Create paper</button>

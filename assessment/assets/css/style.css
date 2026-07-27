@@ -91,7 +91,8 @@ input[type="file"], select, textarea {
 .autosave-status { color: var(--color-muted); font-size: 0.85rem; }
 
 .pdf-split, .mark-split { display: flex; gap: 1.5rem; align-items: flex-start; }
-.pdf-pane, .script-pane { flex: 1; min-width: 0; }
+.pdf-pane { flex: 1.6; min-width: 0; }
+.script-pane { flex: 1; min-width: 0; }
 .booklet-pane, .mark-pane { flex: 1; min-width: 0; }
 .pdf-frame { width: 100%; height: 70vh; border: 1px solid var(--color-border); border-radius: 6px; }
 

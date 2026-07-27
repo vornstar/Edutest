@@ -81,6 +81,18 @@ $hasTypedAnswers = $paper['type'] === 'digital' && empty($submission['scan_drive
                     </fieldset>
                 <?php endforeach; ?>
 
+                <?php if (!$questions): ?>
+                    <fieldset class="question-block">
+                        <legend>Overall score<?= $paper['max_marks'] !== null ? ' (max ' . htmlspecialchars((string) $paper['max_marks']) . ')' : '' ?></legend>
+                        <label>Score
+                            <input type="number" step="0.5" min="0" <?= $paper['max_marks'] !== null ? 'max="' . htmlspecialchars((string) $paper['max_marks']) . '"' : '' ?>
+                                   name="overall_score"
+                                   value="<?= htmlspecialchars((string) ($primaryMarks['overall']['score'] ?? '')) ?>">
+                        </label>
+                        <label>Comment <textarea name="overall_comment" rows="3"><?= htmlspecialchars($primaryMarks['overall']['comment'] ?? '') ?></textarea></label>
+                    </fieldset>
+                <?php endif; ?>
+
                 <button type="submit" class="btn btn-primary">Save marks</button>
             </form>
 

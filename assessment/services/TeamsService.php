@@ -61,7 +61,11 @@ final class TeamsService
             // class's own teacher is enrolled as class-level 'teacher' so
             // they show up correctly on the class roster, but that still
             // says nothing about their platform-wide role.
-            $user = User::provisionFromRoster($email, (string) ($member['displayName'] ?? $email));
+            // Graph's own "id" for a class member is their Azure AD object id -
+            // captured here (not just at login) so a grade can be written
+            // back to their Teams submission later without a separate
+            // lookup (see pushGrade()).
+            $user = User::provisionFromRoster($email, (string) ($member['displayName'] ?? $email), (string) ($member['id'] ?? '') ?: null);
             $roleInClass = ($member['primaryRole'] ?? 'student') === 'teacher' ? 'teacher' : 'student';
             ClassRoster::enroll($classId, (int) $user['id'], $roleInClass);
         }
@@ -75,7 +79,7 @@ final class TeamsService
      * /education/classes/{id}/assignments, and stores the returned
      * assignment id + deep link back on our record.
      */
-    public function pushAssignment(int $localAssignmentId, string $teamsClassId, string $title, ?string $dueAt, string $deepLinkUrl): string
+    public function pushAssignment(int $localAssignmentId, string $teamsClassId, string $title, ?string $dueAt, string $deepLinkUrl, ?float $maxMarks = null): string
     {
         $body = [
             'displayName' => $title,
@@ -84,14 +88,24 @@ final class TeamsService
                 'contentType' => 'html',
             ],
             'assignTo' => ['@odata.type' => '#microsoft.graph.educationAssignmentClassRecipient'],
-            'status' => 'published',
         ];
         if ($dueAt) {
             $body['dueDateTime'] = gmdate('Y-m-d\TH:i:s\Z', strtotime($dueAt));
         }
+        if ($maxMarks !== null) {
+            $body['grading'] = [
+                '@odata.type' => 'microsoft.graph.educationAssignmentPointsGradeType',
+                'maxPoints' => $maxMarks,
+            ];
+        }
 
+        // Graph only allows creating an assignment as a draft - status is
+        // rejected (HTTP 400) if set to anything else on creation. Making
+        // it visible to students takes a separate call to the dedicated
+        // /publish action afterward.
         $result = $this->graph->post("/education/classes/{$teamsClassId}/assignments", $body);
         $teamsAssignmentId = (string) $result['id'];
+        $this->graph->post("/education/classes/{$teamsClassId}/assignments/{$teamsAssignmentId}/publish", []);
 
         TestAssignment::setTeamsAssignmentId($localAssignmentId, $teamsAssignmentId);
         return $teamsAssignmentId;
@@ -105,5 +119,38 @@ final class TeamsService
         $this->graph->patch("/education/classes/{$teamsClassId}/assignments/{$teamsAssignmentId}", [
             'status' => $graphStatus === 'assigned' ? 'published' : $graphStatus,
         ]);
+    }
+
+    /**
+     * Writes a mark back to the student's Teams submission for a pushed
+     * assignment, and releases it so they (and the Teams gradebook) can see
+     * it. Matches the Teams submission by the student's Azure AD object id
+     * (captured at roster sync time, see syncClassRoster()) against each
+     * submission's recipient.userId - Graph has no direct "get submission
+     * for this user" lookup, so this fetches the (class-sized, so small)
+     * full submissions list and matches locally.
+     */
+    public function pushGrade(string $teamsClassId, string $teamsAssignmentId, string $studentAadObjectId, float $score): void
+    {
+        $submissions = $this->graph->getAll("/education/classes/{$teamsClassId}/assignments/{$teamsAssignmentId}/submissions");
+
+        $match = null;
+        foreach ($submissions as $s) {
+            if (($s['recipient']['userId'] ?? null) === $studentAadObjectId) {
+                $match = $s;
+                break;
+            }
+        }
+        if (!$match) {
+            throw new RuntimeException('No matching Teams submission found for this student on this assignment.');
+        }
+
+        $this->graph->patch("/education/classes/{$teamsClassId}/assignments/{$teamsAssignmentId}/submissions/{$match['id']}", [
+            'grade' => [
+                '@odata.type' => 'microsoft.graph.educationAssignmentPointsGrade',
+                'points' => $score,
+            ],
+        ]);
+        $this->graph->post("/education/classes/{$teamsClassId}/assignments/{$teamsAssignmentId}/submissions/{$match['id']}/return", []);
     }
 }

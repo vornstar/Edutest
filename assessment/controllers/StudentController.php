@@ -8,6 +8,7 @@ require_once __DIR__ . '/../models/Submission.php';
 require_once __DIR__ . '/../models/Mark.php';
 require_once __DIR__ . '/../models/Paper.php';
 require_once __DIR__ . '/../models/Question.php';
+require_once __DIR__ . '/../models/Annotation.php';
 
 final class StudentController
 {
@@ -36,6 +37,7 @@ final class StudentController
 
         $showFinalMarks = in_array($submission['status'], ['marked', 'moderated'], true);
         $finalMarks = $showFinalMarks ? Mark::latestForSubmission($submissionId, 'primary') : [];
+        $annotations = $showFinalMarks ? Annotation::forSubmission($submissionId) : [];
 
         require __DIR__ . '/../views/student/submission_summary.php';
     }

@@ -71,6 +71,19 @@ $hasTypedAnswers = $paper['type'] === 'digital' && empty($submission['scan_drive
                     </fieldset>
                 <?php endforeach; ?>
 
+                <?php if (!$questions): ?>
+                    <fieldset class="question-block">
+                        <legend>Overall score<?= $paper['max_marks'] !== null ? ' (max ' . htmlspecialchars((string) $paper['max_marks']) . ')' : '' ?></legend>
+                        <?php if ($showPrimary && isset($primaryMarks['overall'])): ?>
+                            <p><strong>Primary marker score:</strong> <?= htmlspecialchars((string) $primaryMarks['overall']['score']) ?> &mdash; <?= htmlspecialchars($primaryMarks['overall']['comment'] ?? '') ?></p>
+                        <?php endif; ?>
+                        <label>Your score
+                            <input type="number" step="0.5" min="0" <?= $paper['max_marks'] !== null ? 'max="' . htmlspecialchars((string) $paper['max_marks']) . '"' : '' ?> name="overall_score">
+                        </label>
+                        <label>Comment <textarea name="overall_comment" rows="3"></textarea></label>
+                    </fieldset>
+                <?php endif; ?>
+
                 <button type="submit" class="btn btn-primary">Submit moderation</button>
             </form>
         </div>

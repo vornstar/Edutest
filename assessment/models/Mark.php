@@ -8,13 +8,16 @@ require_once __DIR__ . '/Crypto.php';
 final class Mark
 {
     /**
-     * Teacher records/overwrites a score for a question on a submission.
-     * Every write is preserved (not updated in place) so the audit trail
-     * retains the full history of primary marks and moderation adjustments.
-     * The comment is about a specific student's work, so it's encrypted at
-     * rest like every other piece of student content.
+     * Teacher records/overwrites a score for a question on a submission -
+     * or, if $questionId is null, an overall whole-paper mark (used for
+     * pdf-type papers with no per-question breakdown, see
+     * PaperController::store()/Paper::max_marks). Every write is preserved
+     * (not updated in place) so the audit trail retains the full history of
+     * primary marks and moderation adjustments. The comment is about a
+     * specific student's work, so it's encrypted at rest like every other
+     * piece of student content.
      */
-    public static function record(int $submissionId, int $questionId, int $markerId, float $score, ?string $comment, string $type = 'primary'): int
+    public static function record(int $submissionId, ?int $questionId, int $markerId, float $score, ?string $comment, string $type = 'primary'): int
     {
         $stmt = Database::connection()->prepare(
             'INSERT INTO marks (submission_id, question_id, marker_id, mark_type, score, comment_cipher)
@@ -38,7 +41,12 @@ final class Mark
         return $id;
     }
 
-    /** Latest mark per question for a submission, keyed by question_id, of a given type. */
+    /**
+     * Latest mark per question for a submission, of a given type, keyed by
+     * question_id - or by the string 'overall' for a whole-paper mark
+     * (question_id IS NULL; MySQL's GROUP BY treats all NULLs as one group,
+     * so "the latest overall mark" falls out of the same query for free).
+     */
     public static function latestForSubmission(int $submissionId, string $type = 'primary'): array
     {
         $stmt = Database::connection()->prepare(
@@ -54,7 +62,8 @@ final class Mark
         $rows = $stmt->fetchAll();
         $byQuestion = [];
         foreach ($rows as $row) {
-            $byQuestion[(int) $row['question_id']] = self::withDecryptedComment($row);
+            $key = $row['question_id'] !== null ? (int) $row['question_id'] : 'overall';
+            $byQuestion[$key] = self::withDecryptedComment($row);
         }
         return $byQuestion;
     }

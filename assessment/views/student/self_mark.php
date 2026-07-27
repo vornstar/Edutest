@@ -34,7 +34,13 @@ require_once __DIR__ . '/../../models/Question.php';
             </fieldset>
         <?php endforeach; ?>
 
-        <button type="submit" class="btn btn-primary">Submit self-assessment</button>
+        <?php if ($questions): ?>
+            <button type="submit" class="btn btn-primary">Submit self-assessment</button>
+        <?php endif; ?>
     </form>
+
+    <?php if (!$questions): ?>
+        <p>This paper doesn't have a question-by-question breakdown to self-mark against - your teacher will give you an overall mark and feedback instead.</p>
+    <?php endif; ?>
 </div>
 <?php require __DIR__ . '/../partials/footer.php'; ?>

@@ -71,6 +71,7 @@ final class PaperController
             'subject' => trim((string) ($_POST['subject'] ?? '')) ?: null,
             'type' => $type,
             'created_by' => $user['id'],
+            'max_marks' => $type === 'pdf' && !empty($_POST['max_marks']) ? (float) $_POST['max_marks'] : null,
             'duration_minutes' => !empty($_POST['duration_minutes']) ? (int) $_POST['duration_minutes'] : null,
         ]);
 
@@ -139,7 +140,7 @@ final class PaperController
         $paper = self::requireManageable($paperId, $user);
 
         $questions = Question::forPaper($paperId);
-        $maxTotal = array_sum(array_column($questions, 'max_marks'));
+        $maxTotal = $questions ? array_sum(array_column($questions, 'max_marks')) : (float) ($paper['max_marks'] ?? 0);
 
         $assignments = TestAssignment::forPaper($paperId);
         $rows = [];
@@ -247,6 +248,20 @@ final class PaperController
         self::requireManageable($paperId, $user);
 
         Paper::publish($paperId);
+        header('Location: /assessment/teacher/papers/' . $paperId);
+        exit;
+    }
+
+    /** Edits the max marks value for a pdf-type paper (no per-question breakdown) - editable any time, e.g. before assigning, or if it was set wrong. */
+    public static function updateMaxMarks(int $paperId): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        AuthController::verifyCsrf();
+        self::requireManageable($paperId, $user);
+
+        $maxMarks = !empty($_POST['max_marks']) ? (float) $_POST['max_marks'] : null;
+        Paper::setMaxMarks($paperId, $maxMarks);
+
         header('Location: /assessment/teacher/papers/' . $paperId);
         exit;
     }

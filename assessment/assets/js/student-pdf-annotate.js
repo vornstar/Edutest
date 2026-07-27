@@ -57,15 +57,17 @@
             saveNow();
             fabricCanvas.dispose();
         }
-        placingText = false;
-        canvasEl.style.cursor = '';
+        canvasEl.style.cursor = 'crosshair';
 
         PdfAnnotateCore.renderPageToImage(pdfDoc, pageNumber, 1.4).then(function (rendered) {
             canvasEl.width = rendered.width;
             canvasEl.height = rendered.height;
             lastRendered = rendered;
 
-            fabricCanvas = new fabric.Canvas(canvasEl, { isDrawingMode: true });
+            // Text is the default/primary way to answer a PDF exam paper -
+            // ready to click-and-type immediately, no need to pick a tool first.
+            fabricCanvas = new fabric.Canvas(canvasEl, { isDrawingMode: false });
+            placingText = true;
             PdfAnnotateCore.fitCanvasToContainer(fabricCanvas, container, rendered.width, rendered.height);
             fabric.Image.fromURL(rendered.dataUrl, function (img) {
                 fabricCanvas.setBackgroundImage(img, fabricCanvas.renderAll.bind(fabricCanvas));
@@ -77,9 +79,11 @@
             fabricCanvas.on('object:modified', debounceSave);
             fabricCanvas.on('object:removed', debounceSave);
             fabricCanvas.on('mouse:down', function (opt) {
-                if (!placingText) return;
-                placingText = false;
-                canvasEl.style.cursor = '';
+                // Stays armed after placing one text box, so the next click
+                // starts another without having to re-select the tool - but
+                // a click that lands ON an existing box (opt.target set)
+                // should edit/select it, not stack a new one on top.
+                if (!placingText || opt.target) return;
                 var pointer = fabricCanvas.getPointer(opt.e);
                 var text = new fabric.IText('Type here', {
                     left: pointer.x, top: pointer.y, fill: STUDENT_COLOR, fontSize: 16,

@@ -135,8 +135,10 @@ final class TestController
         if ($syncToTeams) {
             $paper = Paper::find($paperId);
             $deepLink = self::deepLinkUrl($assignmentId);
+            $questions = Question::forPaper($paperId);
+            $maxMarks = $questions ? array_sum(array_column($questions, 'max_marks')) : (float) ($paper['max_marks'] ?? 0);
             $teams = new TeamsService((int) $user['id']);
-            $teams->pushAssignment($assignmentId, (string) $class['teams_class_id'], (string) $paper['title'], $dueAt, $deepLink);
+            $teams->pushAssignment($assignmentId, (string) $class['teams_class_id'], (string) $paper['title'], $dueAt, $deepLink, $maxMarks > 0 ? $maxMarks : null);
         }
 
         header('Location: /assessment/teacher/classes/' . $classId);

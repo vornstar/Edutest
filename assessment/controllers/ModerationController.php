@@ -111,6 +111,11 @@ final class ModerationController
             Mark::record((int) $moderation['submission_id'], (int) $questionId, (int) $user['id'], (float) $score, $comment !== null ? (string) $comment : null, 'moderation');
         }
 
+        if (isset($_POST['overall_score']) && $_POST['overall_score'] !== '') {
+            $comment = $_POST['overall_comment'] ?? null;
+            Mark::record((int) $moderation['submission_id'], null, (int) $user['id'], (float) $_POST['overall_score'], $comment !== null ? (string) $comment : null, 'moderation');
+        }
+
         $result = Moderation::complete($moderationId);
         require __DIR__ . '/../views/teacher/moderation_result.php';
     }

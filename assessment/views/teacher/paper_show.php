@@ -34,6 +34,16 @@ require __DIR__ . '/../partials/header.php';
     <p>Type: <?= htmlspecialchars($paper['type']) ?> &middot; Status: <?= htmlspecialchars($paper['status']) ?></p>
     <p class="autosave-status">Self-marking is set per-assignment now, not per-paper - see the class page for each assignment once it's been assigned.</p>
 
+    <?php if ($paper['type'] === 'pdf'): ?>
+        <form method="post" action="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/max-marks" style="display:flex;gap:0.5rem;align-items:flex-end;">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
+            <label>Max marks (one overall score when marking, out of this)
+                <input type="number" step="0.5" min="0" name="max_marks" value="<?= htmlspecialchars((string) ($paper['max_marks'] ?? '')) ?>">
+            </label>
+            <button type="submit" class="btn">Save</button>
+        </form>
+    <?php endif; ?>
+
     <div class="question-block">
         <h2 style="margin-top:0">Test this paper before assigning it</h2>
         <p>Take the paper yourself exactly as a student would - typing/writing included - then go mark or moderate your own attempt. Nothing here is visible to students or counted in any report; it's just for you.</p>
@@ -72,6 +82,7 @@ require __DIR__ . '/../partials/header.php';
         </form>
     <?php endif; ?>
 
+    <?php if ($paper['type'] === 'digital'): ?>
     <h2>Questions (answer booklet structure)</h2>
     <table class="data-table">
         <thead><tr><th>#</th><th>Section</th><th>Type</th><th>Text</th><th>Max marks</th></tr></thead>
@@ -119,5 +130,6 @@ require __DIR__ . '/../partials/header.php';
         <input type="file" name="csv_file" accept=".csv" required>
         <button type="submit" class="btn">Import CSV</button>
     </form>
+    <?php endif; ?>
 </div>
 <?php require __DIR__ . '/../partials/footer.php'; ?>

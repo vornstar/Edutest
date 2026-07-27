@@ -153,8 +153,10 @@ final class GraphApiClient
 
         $decoded = json_decode($body, true);
         if ($status >= 400) {
+            $code = $decoded['error']['code'] ?? null;
             $message = $decoded['error']['message'] ?? $body;
-            throw new RuntimeException("Graph API error (HTTP {$status}): {$message}");
+            $suffix = $code ? " [{$code}]" : '';
+            throw new RuntimeException("Graph API error (HTTP {$status}){$suffix}: {$message}");
         }
 
         return is_array($decoded) ? $decoded : [];

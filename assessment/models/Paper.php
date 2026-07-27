@@ -8,8 +8,8 @@ final class Paper
     public static function create(array $data): int
     {
         $stmt = Database::connection()->prepare(
-            'INSERT INTO papers (title, subject, type, created_by, pdf_drive_item_id, mark_scheme_drive_item_id, self_marking_enabled, duration_minutes, status)
-             VALUES (:title, :subject, :type, :created_by, :pdf_drive_item_id, :mark_scheme_drive_item_id, :self_marking_enabled, :duration_minutes, :status)'
+            'INSERT INTO papers (title, subject, type, created_by, pdf_drive_item_id, mark_scheme_drive_item_id, self_marking_enabled, max_marks, duration_minutes, status)
+             VALUES (:title, :subject, :type, :created_by, :pdf_drive_item_id, :mark_scheme_drive_item_id, :self_marking_enabled, :max_marks, :duration_minutes, :status)'
         );
         $stmt->execute([
             'title' => $data['title'],
@@ -19,10 +19,17 @@ final class Paper
             'pdf_drive_item_id' => $data['pdf_drive_item_id'] ?? null,
             'mark_scheme_drive_item_id' => $data['mark_scheme_drive_item_id'] ?? null,
             'self_marking_enabled' => !empty($data['self_marking_enabled']) ? 1 : 0,
+            'max_marks' => $data['max_marks'] ?? null,
             'duration_minutes' => $data['duration_minutes'] ?? null,
             'status' => $data['status'] ?? 'draft',
         ]);
         return (int) Database::connection()->lastInsertId();
+    }
+
+    public static function setMaxMarks(int $paperId, ?float $maxMarks): void
+    {
+        $stmt = Database::connection()->prepare('UPDATE papers SET max_marks = :max_marks WHERE id = :id');
+        $stmt->execute(['max_marks' => $maxMarks, 'id' => $paperId]);
     }
 
     public static function find(int $id): ?array

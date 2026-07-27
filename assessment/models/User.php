@@ -188,26 +188,40 @@ final class User
      * has a local row to enroll, without ever granting them anything beyond
      * the default 'student' role. If they were already pre-provisioned by
      * an Admin (found by email) or have signed in before, that existing row
-     * - and whatever role it holds - is reused untouched.
+     * - and whatever role it holds - is reused untouched, except their
+     * aad_object_id is backfilled if it wasn't captured yet (e.g. an
+     * admin-provisioned account, or one synced before this was added) -
+     * needed to write a grade back to their Teams submission later.
      */
-    public static function provisionFromRoster(string $email, string $displayName): array
+    public static function provisionFromRoster(string $email, string $displayName, ?string $aadObjectId = null): array
     {
         $email = self::normalizeEmail($email);
         $existing = self::findByEmail($email);
         if ($existing) {
+            if ($aadObjectId && empty($existing['aad_object_id'])) {
+                self::setAadObjectId((int) $existing['id'], $aadObjectId);
+                $existing['aad_object_id'] = $aadObjectId;
+            }
             return $existing;
         }
 
         $pdo = Database::connection();
         $insert = $pdo->prepare(
-            "INSERT INTO users (email_cipher, email_hash, display_name_cipher, role) VALUES (:email_cipher, :email_hash, :display_name_cipher, 'student')"
+            "INSERT INTO users (email_cipher, email_hash, display_name_cipher, aad_object_id, role) VALUES (:email_cipher, :email_hash, :display_name_cipher, :aad_object_id, 'student')"
         );
         $insert->execute([
             'email_cipher' => Crypto::encrypt($email),
             'email_hash' => Crypto::searchHash($email),
             'display_name_cipher' => Crypto::encrypt($displayName),
+            'aad_object_id' => $aadObjectId,
         ]);
         return self::find((int) $pdo->lastInsertId());
+    }
+
+    public static function setAadObjectId(int $userId, string $aadObjectId): void
+    {
+        $stmt = Database::connection()->prepare('UPDATE users SET aad_object_id = :aad_object_id WHERE id = :id');
+        $stmt->execute(['aad_object_id' => $aadObjectId, 'id' => $userId]);
     }
 
     public static function setRole(int $userId, string $role, int $actingAdminId): void
