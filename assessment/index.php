@@ -87,6 +87,9 @@ $routes = [
     ['GET', '/teacher/papers/{id}/assign', [TestController::class, 'assignForm']],
     ['POST', '/teacher/papers/{id}/assign', [TestController::class, 'assign']],
     ['POST', '/teacher/assignments/{id}/self-marking', [TestController::class, 'toggleSelfMarking']],
+    ['GET', '/teacher/open-tests', [TestController::class, 'openTests']],
+    ['POST', '/teacher/assignments/{id}/close', [TestController::class, 'closeTest']],
+    ['POST', '/teacher/assignments/{id}/reopen', [TestController::class, 'reopenTest']],
     ['GET', '/teacher/papers/{id}/results', [PaperController::class, 'results']],
 
     ['GET', '/teacher/assignments/{id}/upload-scan', [ScanUploadController::class, 'form']],
@@ -115,6 +118,7 @@ $routes = [
 
     // Data (read-only reporting)
     ['GET', '/data', [DataController::class, 'dashboard']],
+    ['GET', '/data/department-results', [DataController::class, 'departmentResults']],
 
     // Admin
     ['GET', '/admin/users', [AdminController::class, 'users']],

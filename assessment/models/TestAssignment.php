@@ -66,6 +66,33 @@ final class TestAssignment
         return $stmt->fetchAll();
     }
 
+    /** Every real (non-self-test) assignment this teacher-portal user has assigned - used by the "Open tests" page. */
+    public static function forAssignedBy(int $userId): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT a.*, p.title AS paper_title, c.name AS class_name FROM test_assignments a
+             INNER JOIN papers p ON p.id = a.paper_id
+             INNER JOIN classes c ON c.id = a.class_id
+             WHERE a.assigned_by = :assigned_by AND a.class_id IS NOT NULL
+             ORDER BY a.closed_at IS NOT NULL, a.due_at IS NULL, a.due_at ASC'
+        );
+        $stmt->execute(['assigned_by' => $userId]);
+        return $stmt->fetchAll();
+    }
+
+    /** Ends a test window early - blocks further student work (see TestController::authorizeSubmissionOwner/take), independent of due_at. */
+    public static function close(int $id): void
+    {
+        $stmt = Database::connection()->prepare('UPDATE test_assignments SET closed_at = NOW() WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+    }
+
+    public static function reopen(int $id): void
+    {
+        $stmt = Database::connection()->prepare('UPDATE test_assignments SET closed_at = NULL WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+    }
+
     public static function forStudent(int $studentId): array
     {
         $stmt = Database::connection()->prepare(

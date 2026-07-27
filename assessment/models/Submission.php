@@ -118,6 +118,20 @@ final class Submission
         self::setStatus($submissionId, 'pending_moderation');
     }
 
+    /** Another submission still awaiting marking for the same paper (any class it's assigned to) - powers the "Next unmarked" button so a teacher can work through a batch without returning to the queue each time. */
+    public static function nextUnmarked(int $currentSubmissionId, int $paperId): ?int
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT s.id FROM submissions s
+             INNER JOIN test_assignments a ON a.id = s.assignment_id
+             WHERE a.paper_id = :paper_id AND s.id != :current_id AND s.status IN ("submitted", "pending_moderation")
+             ORDER BY s.submitted_at ASC LIMIT 1'
+        );
+        $stmt->execute(['paper_id' => $paperId, 'current_id' => $currentSubmissionId]);
+        $id = $stmt->fetchColumn();
+        return $id !== false ? (int) $id : null;
+    }
+
     /** student_name is encrypted (users.display_name_cipher) so it can't be sorted in SQL - decrypted then re-sorted alphabetically here instead. */
     public static function forAssignment(int $assignmentId): array
     {

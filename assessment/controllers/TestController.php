@@ -85,12 +85,14 @@ final class TestController
             exit;
         }
 
+        $assignment = TestAssignment::find((int) $submission['assignment_id']);
+        self::requireOpenAssignment($assignment);
+
         if ($user['role'] === User::ROLE_STUDENT) {
             return [$user, $submission];
         }
 
         if (in_array($user['role'], User::TEACHER_PORTAL_ROLES, true)) {
-            $assignment = TestAssignment::find((int) $submission['assignment_id']);
             if ($assignment && TestAssignment::isSelfTest($assignment) && (int) $assignment['assigned_by'] === (int) $user['id']) {
                 return [$user, $submission];
             }
@@ -98,6 +100,16 @@ final class TestController
 
         http_response_code(404);
         exit;
+    }
+
+    /** Blocks any further student-facing write once a teacher has closed the test window early (see TestAssignment::close) - self-tests are never closed, so this is a no-op for them. */
+    private static function requireOpenAssignment(?array $assignment): void
+    {
+        if ($assignment && !empty($assignment['closed_at'])) {
+            http_response_code(403);
+            echo 'This test window has been closed by your teacher.';
+            exit;
+        }
     }
 
     // --- Teacher: assign a paper to a class, optionally pushing to Teams ---
@@ -146,6 +158,70 @@ final class TestController
     }
 
     /**
+     * Every real test window this teacher-portal user has open right now,
+     * with a quick progress readout per one - answers "what tests do I
+     * still have running?" without having to check each class page.
+     */
+    public static function openTests(): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        $assignments = TestAssignment::forAssignedBy((int) $user['id']);
+
+        $progress = [];
+        foreach ($assignments as $a) {
+            $rosterSize = count(ClassRoster::students((int) $a['class_id']));
+            $submissions = Submission::forAssignment((int) $a['id']);
+            $completed = 0;
+            foreach ($submissions as $s) {
+                if ($s['status'] !== 'in_progress') {
+                    $completed++;
+                }
+            }
+            $progress[(int) $a['id']] = [
+                'roster' => $rosterSize,
+                'started' => count($submissions),
+                'completed' => $completed,
+            ];
+        }
+
+        require __DIR__ . '/../views/teacher/open_tests.php';
+    }
+
+    /** Ends a test window early - stops any further student work being accepted on it (see requireOpenAssignment). */
+    public static function closeTest(int $assignmentId): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        AuthController::verifyCsrf();
+        $assignment = TestAssignment::find($assignmentId);
+        if (!$assignment) {
+            http_response_code(404);
+            exit;
+        }
+        PaperController::requireManageable((int) $assignment['paper_id'], $user);
+
+        TestAssignment::close($assignmentId);
+        header('Location: /assessment/teacher/open-tests');
+        exit;
+    }
+
+    /** Reopens a closed test window so a student can pick up where they left off (e.g. an agreed extension). */
+    public static function reopenTest(int $assignmentId): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        AuthController::verifyCsrf();
+        $assignment = TestAssignment::find($assignmentId);
+        if (!$assignment) {
+            http_response_code(404);
+            exit;
+        }
+        PaperController::requireManageable((int) $assignment['paper_id'], $user);
+
+        TestAssignment::reopen($assignmentId);
+        header('Location: /assessment/teacher/open-tests');
+        exit;
+    }
+
+    /**
      * Flips self-marking on/off for an already-assigned test - lets a
      * teacher hold it off while the class is still sitting the test, then
      * enable it once everyone's finished (or due date has passed) so early
@@ -183,6 +259,18 @@ final class TestController
         $assignment = TestAssignment::find($assignmentId);
         if (!$assignment || !ClassRoster::isMember((int) $assignment['class_id'], (int) $user['id'])) {
             http_response_code(404);
+            exit;
+        }
+
+        // Closing blocks starting a fresh attempt or continuing an
+        // in-progress one - but a student revisiting their own already-
+        // submitted work can still view it (autosave/submit themselves are
+        // separately blocked by requireOpenAssignment() via
+        // authorizeSubmissionOwner regardless).
+        $existing = Submission::findByAssignmentAndStudent($assignmentId, (int) $user['id']);
+        if (!empty($assignment['closed_at']) && (!$existing || $existing['status'] === 'in_progress')) {
+            http_response_code(403);
+            echo 'This test window has been closed by your teacher.';
             exit;
         }
 

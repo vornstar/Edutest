@@ -111,8 +111,30 @@
                 fabricCanvas.isDrawingMode = false;
                 placingText = true;
                 canvasEl.style.cursor = 'crosshair';
+            } else if (tool === 'delete') {
+                deleteSelected();
             }
         });
+    });
+
+    function deleteSelected() {
+        if (!fabricCanvas) return;
+        var active = fabricCanvas.getActiveObject();
+        if (!active) return;
+        fabricCanvas.remove(active);
+        fabricCanvas.discardActiveObject();
+        fabricCanvas.requestRenderAll();
+    }
+
+    // Delete/Backspace removes the selected stroke/text box - but only when
+    // nothing is actively being typed into, so backspacing while editing
+    // text still just deletes a character as expected.
+    document.addEventListener('keydown', function (e) {
+        if (!fabricCanvas || (e.key !== 'Delete' && e.key !== 'Backspace')) return;
+        var active = fabricCanvas.getActiveObject();
+        if (!active || active.isEditing) return;
+        e.preventDefault();
+        deleteSelected();
     });
 
     function debounceSave() {

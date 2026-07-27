@@ -9,10 +9,12 @@ $roleId = $__user['role'];
 <?php if (in_array($roleId, User::TEACHER_PORTAL_ROLES, true)): ?>
     <a href="/assessment/teacher/papers">Papers</a>
     <a href="/assessment/teacher/classes">Classes</a>
+    <a href="/assessment/teacher/open-tests">Open tests</a>
     <a href="/assessment/teacher/marking">Marking</a>
     <a href="/assessment/teacher/moderation/queue">Moderation</a>
     <?php if ($roleId === User::ROLE_SUBJECT_LEADER): ?>
         <a href="/assessment/teacher/moderation/flagged">Flagged</a>
+        <a href="/assessment/data/department-results">Department results</a>
         <a href="/assessment/data">Reports</a>
     <?php endif; ?>
 <?php endif; ?>

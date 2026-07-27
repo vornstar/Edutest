@@ -31,6 +31,17 @@ $hasTypedAnswers = $paper['type'] === 'digital' && empty($submission['scan_drive
             <?php else: ?>
                 <p class="autosave-status">The student's own typing/writing on the PDF (if any) shows read-only in blue-ish tones on top - your marks go underneath, in whatever colour you pick below.</p>
             <?php endif; ?>
+            <div class="annotation-tools">
+                <button type="button" data-tool="pen">Pen</button>
+                <button type="button" data-tool="highlighter">Highlighter</button>
+                <button type="button" data-tool="text">Text</button>
+                <button type="button" data-tool="delete">Delete selected</button>
+                <input type="color" data-tool="color" value="#059669">
+                <button type="button" id="save-annotation">Save annotations</button>
+                <button type="button" data-page-prev>&larr; Prev</button>
+                <span data-page-indicator>Page 1</span>
+                <button type="button" data-page-next>Next &rarr;</button>
+            </div>
             <div class="annotation-stack">
                 <?php if ($submission['scan_drive_item_id']): ?>
                     <canvas id="annotation-canvas" class="annotation-canvas" data-pdf-src="/assessment/files/scans/<?= (int) $submission['id'] ?>"></canvas>
@@ -38,16 +49,6 @@ $hasTypedAnswers = $paper['type'] === 'digital' && empty($submission['scan_drive
                     <canvas id="annotation-canvas" class="annotation-canvas" data-pdf-src="/assessment/files/papers/<?= (int) $paper['id'] ?>/paper"></canvas>
                 <?php endif; ?>
                 <canvas id="annotation-student-layer" class="annotation-canvas annotation-student-layer"></canvas>
-            </div>
-            <div class="annotation-tools">
-                <button type="button" data-tool="pen">Pen</button>
-                <button type="button" data-tool="highlighter">Highlighter</button>
-                <button type="button" data-tool="text">Text</button>
-                <input type="color" data-tool="color" value="#059669">
-                <button type="button" id="save-annotation">Save annotations</button>
-                <button type="button" data-page-prev>&larr; Prev</button>
-                <span data-page-indicator>Page 1</span>
-                <button type="button" data-page-next>Next &rarr;</button>
             </div>
         </div>
         <?php endif; ?>

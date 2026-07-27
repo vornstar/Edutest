@@ -30,7 +30,7 @@ body {
 
 .brand { font-weight: 700; color: var(--color-primary); text-decoration: none; }
 
-.main-nav { display: flex; gap: 1rem; flex: 1; }
+.main-nav { display: flex; gap: 0.85rem 1rem; flex: 1; flex-wrap: wrap; }
 .main-nav a { color: var(--color-text); text-decoration: none; font-size: 0.9rem; }
 .main-nav a:hover { color: var(--color-primary); }
 
@@ -90,10 +90,14 @@ input[type="file"], select, textarea {
 
 .autosave-status { color: var(--color-muted); font-size: 0.85rem; }
 
-.pdf-split, .mark-split { display: flex; gap: 1.5rem; align-items: flex-start; }
-.pdf-pane { flex: 1.6; min-width: 0; }
+/* The exam paper is the main event when taking a test - full width on its
+   own row, with the (largely optional - most answering now happens
+   directly on the PDF) answer booklet stacked below it, rather than
+   splitting the screen and capping how big the paper itself can render. */
+.pdf-split { display: flex; flex-direction: column; gap: 1.5rem; }
+.mark-split { display: flex; gap: 1.5rem; align-items: flex-start; }
 .script-pane { flex: 1; min-width: 0; }
-.booklet-pane, .mark-pane { flex: 1; min-width: 0; }
+.mark-pane { flex: 1; min-width: 0; }
 .pdf-frame { width: 100%; height: 70vh; border: 1px solid var(--color-border); border-radius: 6px; }
 
 /* height:auto is essential here: the canvas's actual pixel size is set via
@@ -160,13 +164,14 @@ input[type="file"], select, textarea {
 .roster-list { columns: 2; }
 
 @media (max-width: 800px) {
-    /* align-items:flex-start (set above for the side-by-side desktop
-       layout) makes a flex item shrink-to-fit its content instead of
-       filling the container's width - harmless in row mode, but once
-       flex-direction flips to column here that's the CROSS axis, so a
-       wide PDF canvas makes its whole pane (and the canvas inside it)
-       stay oversized instead of stacking full-width like every other
-       pane. Force stretch back on for this axis. */
-    .pdf-split, .mark-split { flex-direction: column; align-items: stretch; }
-    .main-nav { flex-wrap: wrap; }
+    /* .pdf-split is already a full-width column layout at every screen
+       size (see above) - only .mark-split (still side-by-side on desktop)
+       needs to switch to stacked here. align-items:flex-start (set above
+       for that side-by-side desktop layout) makes a flex item shrink-to-fit
+       its content instead of filling the container's width - harmless in
+       row mode, but once flex-direction flips to column here that's the
+       CROSS axis, so a wide PDF canvas would make its whole pane (and the
+       canvas inside it) stay oversized instead of stacking full-width like
+       every other pane. Force stretch back on for this axis. */
+    .mark-split { flex-direction: column; align-items: stretch; }
 }

@@ -43,6 +43,7 @@ final class MarkingController
         $selfMarks = Submission::selfMarks($submissionId);
         $primaryMarks = Mark::latestForSubmission($submissionId, 'primary');
         $annotations = Annotation::forSubmission($submissionId);
+        $nextUnmarkedId = Submission::nextUnmarked($submissionId, (int) $paper['id']);
 
         // Decrypt mark schemes for display only within this authorized view.
         $markSchemes = [];

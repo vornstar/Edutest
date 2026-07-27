@@ -4,6 +4,11 @@ declare(strict_types=1);
 require_once __DIR__ . '/AuthController.php';
 require_once __DIR__ . '/../models/Database.php';
 require_once __DIR__ . '/../models/User.php';
+require_once __DIR__ . '/../models/Paper.php';
+require_once __DIR__ . '/../models/TestAssignment.php';
+require_once __DIR__ . '/../models/Submission.php';
+require_once __DIR__ . '/../models/Mark.php';
+require_once __DIR__ . '/../models/Question.php';
 
 /**
  * Read-only aggregated reporting for the "Data" role (SRS 3.2). Every query
@@ -44,5 +49,45 @@ final class DataController
         )->fetchAll();
 
         require __DIR__ . '/../views/data/dashboard.php';
+    }
+
+    /**
+     * Every individual student result across every paper in the subject
+     * leader's own subject area - including papers created/assigned by
+     * OTHER teachers, since Paper::visibleTo() already includes any paper
+     * matching their managed_subject (SRS 3.2 department oversight). The
+     * institution-wide dashboard() above only ever shows aggregates; this
+     * is the per-student breakdown "see the other teachers' classes'
+     * scores" actually needs.
+     */
+    public static function departmentResults(): void
+    {
+        $user = AuthController::requireRole([User::ROLE_SUBJECT_LEADER, User::ROLE_ADMIN]);
+        $papers = Paper::visibleTo($user);
+
+        $rows = [];
+        foreach ($papers as $paper) {
+            $questions = Question::forPaper((int) $paper['id']);
+            $maxTotal = $questions ? array_sum(array_column($questions, 'max_marks')) : (float) ($paper['max_marks'] ?? 0);
+            $owner = User::find((int) $paper['created_by']);
+
+            foreach (TestAssignment::forPaper((int) $paper['id']) as $assignment) {
+                foreach (Submission::forAssignment((int) $assignment['id']) as $submission) {
+                    $isMarked = in_array($submission['status'], ['marked', 'moderated'], true);
+                    $rows[] = [
+                        'paper_id' => $paper['id'],
+                        'paper_title' => $paper['title'],
+                        'teacher_name' => $owner['display_name'] ?? '—',
+                        'class_name' => $assignment['class_name'],
+                        'student_name' => $submission['student_name'],
+                        'status' => $submission['status'],
+                        'score' => $isMarked ? Mark::totalScore((int) $submission['id'], 'primary') : null,
+                        'max' => $maxTotal,
+                    ];
+                }
+            }
+        }
+
+        require __DIR__ . '/../views/data/department_results.php';
     }
 }

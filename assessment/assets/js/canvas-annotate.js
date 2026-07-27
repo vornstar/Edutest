@@ -35,6 +35,26 @@
         }, 150);
     });
 
+    function deleteSelected() {
+        if (!fabricCanvas) return;
+        var active = fabricCanvas.getActiveObject();
+        if (!active) return;
+        fabricCanvas.remove(active);
+        fabricCanvas.discardActiveObject();
+        fabricCanvas.requestRenderAll();
+    }
+
+    // Registered once (not per-page, unlike wireTools()) - only deletes the
+    // selected object when nothing is actively being typed into, so
+    // backspacing mid-edit still just deletes a character as expected.
+    document.addEventListener('keydown', function (e) {
+        if (!fabricCanvas || (e.key !== 'Delete' && e.key !== 'Backspace')) return;
+        var active = fabricCanvas.getActiveObject();
+        if (!active || active.isEditing) return;
+        e.preventDefault();
+        deleteSelected();
+    });
+
     PdfAnnotateCore.loadDocument(canvasEl.dataset.pdfSrc).then(function (pdfDoc) {
         pagination = PdfAnnotateCore.wirePagination(
             document.querySelector('.annotation-tools'),
@@ -118,6 +138,8 @@
                     fabricCanvas.isDrawingMode = false;
                     placingText = true;
                     canvasEl.style.cursor = 'crosshair';
+                } else if (tool === 'delete') {
+                    deleteSelected();
                 }
             };
         });
