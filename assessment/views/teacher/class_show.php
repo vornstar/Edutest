@@ -26,7 +26,11 @@ require __DIR__ . '/../partials/header.php';
                 <td><?= htmlspecialchars($a['type']) ?></td>
                 <td><?= htmlspecialchars($a['due_at'] ?? '—') ?></td>
                 <td><?= $a['teams_assignment_id'] ? 'Yes' : 'No' ?></td>
-                <td><a href="/assessment/teacher/papers/<?= (int) $a['paper_id'] ?>/preview" target="_blank">Preview as student</a></td>
+                <td>
+                    <a href="/assessment/teacher/papers/<?= (int) $a['paper_id'] ?>/preview" target="_blank">Preview as student</a>
+                    &middot;
+                    <a href="/assessment/teacher/assignments/<?= (int) $a['id'] ?>/upload-scan">Upload photographed scripts</a>
+                </td>
             </tr>
         <?php endforeach; ?>
         <?php if (!$assignments): ?>

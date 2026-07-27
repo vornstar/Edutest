@@ -30,6 +30,7 @@ require_once __DIR__ . '/controllers/TeamsController.php';
 require_once __DIR__ . '/controllers/MarkingController.php';
 require_once __DIR__ . '/controllers/ModerationController.php';
 require_once __DIR__ . '/controllers/FileProxyController.php';
+require_once __DIR__ . '/controllers/ScanUploadController.php';
 require_once __DIR__ . '/controllers/AdminController.php';
 require_once __DIR__ . '/controllers/DataController.php';
 
@@ -84,6 +85,9 @@ $routes = [
     ['GET', '/teacher/self-test/{id}', [TestController::class, 'takeSelfTest']],
     ['GET', '/teacher/papers/{id}/assign', [TestController::class, 'assignForm']],
     ['POST', '/teacher/papers/{id}/assign', [TestController::class, 'assign']],
+
+    ['GET', '/teacher/assignments/{id}/upload-scan', [ScanUploadController::class, 'form']],
+    ['POST', '/teacher/assignments/{id}/upload-scan', [ScanUploadController::class, 'store']],
 
     ['GET', '/teacher/classes', [TeamsController::class, 'classesIndex']],
     ['GET', '/teacher/classes/import', [TeamsController::class, 'browseTeamsClasses']],
