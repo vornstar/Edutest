@@ -26,7 +26,7 @@ $is_mobile = (isset($_GET['state']) && $_GET['state'] === 'mobile') ||
 
 $clientId     = "eb393a58-2841-4188-9e8e-0dd26026b2e6";
 $tenantId     = "3df55413-ced7-4b48-8f6e-30bc4dac254f";
-$clientSecret = qmhs_env('AZURE_CLIENT_SECRET'); // see .env / .env.example - kept out of source control
+$clientSecret = qmhs_env('AZURE_CLIENT_SECRET'); // see .env.php / .env.php.example - kept out of source control
 $redirectUri  = "https://www.qmhsportal.co.uk/auth_handler.php";
 
 // Added Files.Read and Files.Read.All scopes to authorise OneDrive file access

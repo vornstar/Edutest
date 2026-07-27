@@ -1,2 +1,0 @@
-# Configuration, credentials, and the schema file must never be served directly.
-Require all denied

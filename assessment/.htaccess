@@ -13,8 +13,10 @@ RewriteRule ^ - [L]
 
 RewriteRule ^ index.php [L]
 
-# Defense in depth: block direct access to application internals even if
-# the RewriteRule above is ever bypassed by server misconfiguration.
-<FilesMatch "\.(sql|env)$">
-    Require all denied
-</FilesMatch>
+# Note: no `Require`/`Deny` block here. This host's AllowOverride settings
+# don't permit those directives in .htaccess (it 500s the moment one is
+# added), so file-level access control is handled elsewhere instead: model/
+# controller/service .php files are execute-only class definitions with no
+# top-level side effects, so a direct request to one is harmless either
+# way. config/schema.sql should be deleted from the live deployment after
+# it's been imported once - it isn't needed at runtime.

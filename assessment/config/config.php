@@ -5,9 +5,9 @@
  * Portal deployment's own values directly, so the app runs with minimal
  * setup. Actual secrets (DB password, Azure client secret, the AES
  * encryption key) are never hardcoded here - they're loaded from the
- * root-level .env via includes/secrets.php (shared with auth_handler.php)
- * so they never end up in source control. See /.env.example for the keys
- * that file must define.
+ * root-level .env.php via includes/secrets.php (shared with
+ * auth_handler.php) so they never end up in source control. See
+ * /.env.php.example for the keys that file must define.
  */
 
 declare(strict_types=1);
@@ -36,7 +36,7 @@ $GLOBALS['__assessment_config'] = [
     ],
 
     // AES-256-GCM key used only for mark scheme / model answer encryption
-    // (see models/Crypto.php). Must be set in .env before first use - once
+    // (see models/Crypto.php). Must be set in .env.php before first use - once
     // data is encrypted with it, changing it makes that data unreadable.
     'encryption_key' => env('ASSESSMENT_ENCRYPTION_KEY'),
 

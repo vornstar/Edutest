@@ -1,5 +1,4 @@
-.env
-assessment/.env
+.env.php
 vendor/
 *.log
 .DS_Store

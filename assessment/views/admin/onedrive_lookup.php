@@ -8,7 +8,7 @@ require __DIR__ . '/../partials/header.php';
     <h1>Find your shared drive ID</h1>
     <p>The assessment platform stores every exam paper, mark scheme, and scanned script in one shared
         Microsoft 365 drive, so a teacher's upload can be read by the right students and other markers.
-        Pick one option below and copy its ID into <code>ASSESSMENT_ONEDRIVE_DRIVE_ID</code> in your <code>.env</code> file.</p>
+        Pick one option below and copy its ID into <code>ASSESSMENT_ONEDRIVE_DRIVE_ID</code> in your <code>.env.php</code> file.</p>
 
     <?php if ($errors): ?>
         <div class="alert">
@@ -38,7 +38,7 @@ require __DIR__ . '/../partials/header.php';
     <ol>
         <li>Pick one row above - if you already have (or create) a Team just for staff/assessment storage, use that one; otherwise the whole-organisation option works fine.</li>
         <li>Copy the text in its "Drive ID" column.</li>
-        <li>Open <code>.env</code> at your site root and set:
+        <li>Open <code>.env.php</code> at your site root and set:
             <br><code>ASSESSMENT_ONEDRIVE_DRIVE_ID=&lt;the id you copied&gt;</code>
         </li>
         <li>Save. No restart is needed - the next request picks it up.</li>
