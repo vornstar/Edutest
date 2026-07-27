@@ -22,10 +22,22 @@
     var submissionId = panel.dataset.submissionId;
     var csrfToken = panel.dataset.csrf;
     var statusEl = document.getElementById('pdf-answer-status');
+    var container = canvasEl.closest('.pdf-pane') || canvasEl.parentElement;
     var pagination = null;
     var fabricCanvas = null;
     var saveTimer = null;
     var placingText = false;
+    var lastRendered = null;
+
+    var resizeTimer = null;
+    window.addEventListener('resize', function () {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function () {
+            if (fabricCanvas && lastRendered) {
+                PdfAnnotateCore.fitCanvasToContainer(fabricCanvas, container, lastRendered.width, lastRendered.height);
+            }
+        }, 150);
+    });
 
     PdfAnnotateCore.loadDocument(canvasEl.dataset.pdfSrc).then(function (pdfDoc) {
         pagination = PdfAnnotateCore.wirePagination(
@@ -51,8 +63,10 @@
         PdfAnnotateCore.renderPageToImage(pdfDoc, pageNumber, 1.4).then(function (rendered) {
             canvasEl.width = rendered.width;
             canvasEl.height = rendered.height;
+            lastRendered = rendered;
 
             fabricCanvas = new fabric.Canvas(canvasEl, { isDrawingMode: true });
+            PdfAnnotateCore.fitCanvasToContainer(fabricCanvas, container, rendered.width, rendered.height);
             fabric.Image.fromURL(rendered.dataUrl, function (img) {
                 fabricCanvas.setBackgroundImage(img, fabricCanvas.renderAll.bind(fabricCanvas));
             });

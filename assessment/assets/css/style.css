@@ -123,9 +123,49 @@ input[type="file"], select, textarea {
 
 .alert { color: var(--color-danger); font-weight: 600; }
 
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+}
+
+.capture-controls { display: flex; gap: 0.75rem; margin-top: 0.75rem; flex-wrap: wrap; }
+
+.photo-queue {
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+.photo-queue-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+    width: 120px;
+    padding: 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-panel);
+}
+.photo-queue-item img { width: 100%; height: 120px; object-fit: cover; border-radius: 4px; }
+.photo-queue-item span { font-size: 0.8rem; color: var(--color-muted); }
+
 .roster-list { columns: 2; }
 
 @media (max-width: 800px) {
-    .pdf-split, .mark-split { flex-direction: column; }
+    /* align-items:flex-start (set above for the side-by-side desktop
+       layout) makes a flex item shrink-to-fit its content instead of
+       filling the container's width - harmless in row mode, but once
+       flex-direction flips to column here that's the CROSS axis, so a
+       wide PDF canvas makes its whole pane (and the canvas inside it)
+       stay oversized instead of stacking full-width like every other
+       pane. Force stretch back on for this axis. */
+    .pdf-split, .mark-split { flex-direction: column; align-items: stretch; }
     .main-nav { flex-wrap: wrap; }
 }

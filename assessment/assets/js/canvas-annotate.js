@@ -18,10 +18,22 @@
     var panel = document.querySelector('.marking-panel');
     var submissionId = panel.dataset.submissionId;
     var csrfToken = panel.dataset.csrf;
+    var container = canvasEl.closest('.script-pane') || canvasEl.parentElement;
     var pagination = null;
     var fabricCanvas = null;
     var studentStaticCanvas = null;
     var placingText = false;
+    var lastRendered = null;
+
+    var resizeTimer = null;
+    window.addEventListener('resize', function () {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function () {
+            if (!lastRendered) return;
+            if (fabricCanvas) PdfAnnotateCore.fitCanvasToContainer(fabricCanvas, container, lastRendered.width, lastRendered.height);
+            if (studentStaticCanvas) PdfAnnotateCore.fitCanvasToContainer(studentStaticCanvas, container, lastRendered.width, lastRendered.height);
+        }, 150);
+    });
 
     PdfAnnotateCore.loadDocument(canvasEl.dataset.pdfSrc).then(function (pdfDoc) {
         pagination = PdfAnnotateCore.wirePagination(
@@ -43,8 +55,10 @@
         PdfAnnotateCore.renderPageToImage(pdfDoc, pageNumber, 1.4).then(function (rendered) {
             canvasEl.width = rendered.width;
             canvasEl.height = rendered.height;
+            lastRendered = rendered;
 
             fabricCanvas = new fabric.Canvas(canvasEl, { isDrawingMode: true });
+            PdfAnnotateCore.fitCanvasToContainer(fabricCanvas, container, rendered.width, rendered.height);
             fabric.Image.fromURL(rendered.dataUrl, function (img) {
                 fabricCanvas.setBackgroundImage(img, fabricCanvas.renderAll.bind(fabricCanvas));
             });
@@ -75,6 +89,7 @@
         studentLayerEl.width = width;
         studentLayerEl.height = height;
         studentStaticCanvas = new fabric.StaticCanvas(studentLayerEl);
+        PdfAnnotateCore.fitCanvasToContainer(studentStaticCanvas, container, width, height);
 
         var studentJson = window.__studentAnnotations && window.__studentAnnotations[pageNumber];
         if (studentJson) {

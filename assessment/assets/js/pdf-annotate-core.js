@@ -55,6 +55,29 @@
     }
 
     /**
+     * Fabric.js wraps the canvas element it's given in its own
+     * ".canvas-container" div and sets that div's, and both its internal
+     * canvases', inline CSS width/height to the full pixel size - plain
+     * CSS (max-width etc.) on the original canvas element has no effect on
+     * that wrapper, since it isn't part of the wrapper's box at all. The
+     * only way to make a Fabric canvas responsive is through Fabric's own
+     * cssOnly resize, which keeps the full-resolution drawing buffer
+     * (crisp ink/text, correct pointer-to-coordinate math) while only
+     * shrinking the on-screen box to fit its container.
+     */
+    function fitCanvasToContainer(fabricCanvas, containerEl, pxWidth, pxHeight) {
+        if (!containerEl || !pxWidth || !pxHeight) return;
+        var available = containerEl.clientWidth;
+        if (!available) return;
+        var displayWidth = Math.min(available, pxWidth);
+        var displayHeight = displayWidth * (pxHeight / pxWidth);
+        // cssOnly requires the unit suffix explicitly - Fabric skips its
+        // usual "+= 'px'" step for this path, so a bare number here is
+        // silently rejected by the CSSOM and the resize is a no-op.
+        fabricCanvas.setDimensions({ width: displayWidth + 'px', height: displayHeight + 'px' }, { cssOnly: true });
+    }
+
+    /**
      * Wires a simple Prev/Next/page-indicator control set to a callback
      * that (re)renders a given page number. Returns an object with
      * .setPage(n) so callers can also change page programmatically (e.g.
@@ -88,5 +111,6 @@
         loadDocument: loadDocument,
         renderPageToImage: renderPageToImage,
         wirePagination: wirePagination,
+        fitCanvasToContainer: fitCanvasToContainer,
     };
 })(window);
