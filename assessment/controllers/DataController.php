@@ -52,17 +52,18 @@ final class DataController
     }
 
     /**
-     * Every individual student result across every paper in the subject
-     * leader's own subject area - including papers created/assigned by
-     * OTHER teachers, since Paper::visibleTo() already includes any paper
-     * matching their managed_subject (SRS 3.2 department oversight). The
-     * institution-wide dashboard() above only ever shows aggregates; this
-     * is the per-student breakdown "see the other teachers' classes'
-     * scores" actually needs.
+     * Every individual student result across every paper visible to this
+     * user (see Paper::visibleTo()) - for a Teacher or Subject Leader,
+     * that's their own subject area including papers created/assigned by
+     * OTHER teachers (SRS 3.2 department oversight for the Subject Leader,
+     * subject-scoped read visibility for every Teacher); for an Admin,
+     * every paper on the platform. The institution-wide dashboard() above
+     * only ever shows aggregates; this is the per-student breakdown "see
+     * the other teachers' classes' scores" actually needs.
      */
     public static function departmentResults(): void
     {
-        $user = AuthController::requireRole([User::ROLE_SUBJECT_LEADER, User::ROLE_ADMIN]);
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         $papers = Paper::visibleTo($user);
 
         $rows = [];

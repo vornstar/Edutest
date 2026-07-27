@@ -30,11 +30,24 @@ CREATE TABLE IF NOT EXISTS users (
     display_name_cipher  MEDIUMBLOB NOT NULL COMMENT 'AES-256-GCM encrypted display name',
     aad_object_id   VARCHAR(64) NULL COMMENT 'Azure AD object id, captured at Teams roster sync - used to match this user to their Teams submission when writing a grade back (see TeamsService::pushGrade)',
     role            ENUM('student','teacher','subject_leader','data','admin') NOT NULL DEFAULT 'student',
-    managed_subject VARCHAR(128) NULL COMMENT 'For subject_leader: which papers.subject they have department-wide authority over (set by Admin)',
+    managed_subject VARCHAR(128) NULL COMMENT 'Which subject (matches papers.subject, see subjects table) this teacher-portal user belongs to - drives Paper::visibleTo() for every teacher/subject_leader, and additionally grants department-wide MANAGE authority for subject_leader specifically (set by Admin)',
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uq_site_user (site_user_id),
     UNIQUE KEY uq_email_hash (email_hash)
+) ENGINE=InnoDB;
+
+-- Canonical subject list, purely so Admin > Users and paper creation offer a
+-- consistent dropdown instead of free text (which drifted into mismatches
+-- like "Maths" vs "Mathematics" silently breaking subject-based visibility).
+-- users.managed_subject and papers.subject stay plain VARCHAR matched by
+-- name (not a foreign key) - editing/removing an entry here never touches
+-- existing assignments, it only changes what the dropdowns offer going
+-- forward.
+CREATE TABLE IF NOT EXISTS subjects (
+    id   INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(128) NOT NULL,
+    UNIQUE KEY uq_subject_name (name)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS classes (

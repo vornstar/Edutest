@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/AuthController.php';
 require_once __DIR__ . '/../models/User.php';
 require_once __DIR__ . '/../models/AuditLog.php';
+require_once __DIR__ . '/../models/Subject.php';
 require_once __DIR__ . '/../services/OneDriveService.php';
 
 /**
@@ -27,6 +28,7 @@ final class AdminController
             ));
         }
 
+        $subjects = Subject::all();
         require __DIR__ . '/../views/admin/users_index.php';
     }
 
@@ -107,5 +109,64 @@ final class AdminController
         $entityId = (int) ($_GET['entity_id'] ?? 0);
         $entries = ($entityType && $entityId) ? AuditLog::forEntity($entityType, $entityId) : [];
         require __DIR__ . '/../views/admin/audit_log.php';
+    }
+
+    /**
+     * The canonical subject list backing every subject dropdown (teacher
+     * assignment in Admin > Users, paper creation) - see Subject model /
+     * schema.sql for why this is a plain reference list, not a foreign key.
+     */
+    public static function subjects(): void
+    {
+        AuthController::requireRole([User::ROLE_ADMIN]);
+        $subjects = Subject::all();
+        require __DIR__ . '/../views/admin/subjects_index.php';
+    }
+
+    public static function addSubject(): void
+    {
+        AuthController::requireRole([User::ROLE_ADMIN]);
+        AuthController::verifyCsrf();
+
+        $name = trim((string) ($_POST['name'] ?? ''));
+        if ($name !== '') {
+            try {
+                Subject::create($name);
+            } catch (PDOException $e) {
+                // Duplicate name (uq_subject_name) - it already exists, nothing to do.
+            }
+        }
+
+        header('Location: /assessment/admin/subjects');
+        exit;
+    }
+
+    public static function renameSubject(int $subjectId): void
+    {
+        AuthController::requireRole([User::ROLE_ADMIN]);
+        AuthController::verifyCsrf();
+
+        $name = trim((string) ($_POST['name'] ?? ''));
+        if ($name !== '') {
+            try {
+                Subject::rename($subjectId, $name);
+            } catch (PDOException $e) {
+                // Duplicate name (uq_subject_name) - leave the existing entry as it was.
+            }
+        }
+
+        header('Location: /assessment/admin/subjects');
+        exit;
+    }
+
+    public static function deleteSubject(int $subjectId): void
+    {
+        AuthController::requireRole([User::ROLE_ADMIN]);
+        AuthController::verifyCsrf();
+
+        Subject::delete($subjectId);
+
+        header('Location: /assessment/admin/subjects');
+        exit;
     }
 }

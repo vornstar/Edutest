@@ -46,6 +46,34 @@ final class PaperController
         return $paper;
     }
 
+    /**
+     * Who may VIEW a paper (its detail page, results) without necessarily
+     * being able to edit/delete it: anyone who can manage it, plus any
+     * Teacher whose subject (see Admin > Users) matches the paper's -
+     * read-only visibility into a subject's other papers, distinct from
+     * the Subject Leader's additional manage/delete authority over them.
+     */
+    public static function canViewPaper(array $user, array $paper): bool
+    {
+        if (self::canManagePaper($user, $paper)) {
+            return true;
+        }
+        if ($user['role'] === User::ROLE_TEACHER && !empty($user['managed_subject'])) {
+            return strcasecmp((string) $user['managed_subject'], (string) ($paper['subject'] ?? '')) === 0;
+        }
+        return false;
+    }
+
+    public static function requireViewable(int $paperId, array $user): array
+    {
+        $paper = Paper::find($paperId);
+        if (!$paper || !self::canViewPaper($user, $paper)) {
+            http_response_code(404);
+            exit;
+        }
+        return $paper;
+    }
+
     public static function index(): void
     {
         $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
@@ -56,6 +84,8 @@ final class PaperController
     public static function createForm(): void
     {
         AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        require_once __DIR__ . '/../models/Subject.php';
+        $subjects = Subject::all();
         require __DIR__ . '/../views/teacher/paper_create.php';
     }
 
@@ -119,9 +149,10 @@ final class PaperController
     public static function show(int $paperId): void
     {
         $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
-        $paper = self::requireManageable($paperId, $user);
+        $paper = self::requireViewable($paperId, $user);
         $questions = Question::forPaper($paperId);
-        $canDelete = !Paper::hasSubmissions($paperId);
+        $canManage = self::canManagePaper($user, $paper);
+        $canDelete = $canManage && !Paper::hasSubmissions($paperId);
         $selfTest = TestAssignment::findSelfTest($paperId, (int) $user['id']);
         $selfTestSubmission = $selfTest ? Submission::findByAssignmentAndStudent((int) $selfTest['id'], (int) $user['id']) : null;
         require __DIR__ . '/../views/teacher/paper_show.php';
@@ -137,7 +168,7 @@ final class PaperController
     public static function results(int $paperId): void
     {
         $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
-        $paper = self::requireManageable($paperId, $user);
+        $paper = self::requireViewable($paperId, $user);
 
         $questions = Question::forPaper($paperId);
         $maxTotal = $questions ? array_sum(array_column($questions, 'max_marks')) : (float) ($paper['max_marks'] ?? 0);

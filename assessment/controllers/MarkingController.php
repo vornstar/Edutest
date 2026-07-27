@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/AuthController.php';
+require_once __DIR__ . '/PaperController.php';
 require_once __DIR__ . '/../models/Submission.php';
 require_once __DIR__ . '/../models/TestAssignment.php';
 require_once __DIR__ . '/../models/Paper.php';
@@ -26,15 +27,35 @@ final class MarkingController
         require __DIR__ . '/../views/teacher/marking_queue.php';
     }
 
-    public static function markSubmission(int $submissionId): void
+    /**
+     * Marking a submission requires MANAGE authority over its paper (the
+     * paper's creator, an Admin, or a Subject Leader over that subject) -
+     * not just the wider read-only VIEW visibility every subject teacher
+     * now has via the results page (see PaperController::canViewPaper).
+     * Without this, a colleague who can merely see a paper's results could
+     * follow the "Mark" link and edit another teacher's class's marks.
+     */
+    private static function requireMarkable(int $submissionId, array $user): array
     {
-        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
-
         $submission = Submission::find($submissionId);
         if (!$submission) {
             http_response_code(404);
             exit;
         }
+        $assignment = TestAssignment::find((int) $submission['assignment_id']);
+        $paper = Paper::find((int) $assignment['paper_id']);
+        if (!$paper || !PaperController::canManagePaper($user, $paper)) {
+            http_response_code(404);
+            exit;
+        }
+        return $submission;
+    }
+
+    public static function markSubmission(int $submissionId): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        $submission = self::requireMarkable($submissionId, $user);
+
         $assignment = TestAssignment::find((int) $submission['assignment_id']);
         $paper = Paper::find((int) $assignment['paper_id']);
         $questions = Question::forPaper((int) $paper['id']);
@@ -58,6 +79,7 @@ final class MarkingController
     {
         $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         AuthController::verifyCsrf();
+        self::requireMarkable($submissionId, $user);
 
         foreach ((array) ($_POST['scores'] ?? []) as $questionId => $score) {
             if ($score === '') {
@@ -116,6 +138,7 @@ final class MarkingController
     public static function saveAnnotation(int $submissionId): void
     {
         $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        self::requireMarkable($submissionId, $user);
 
         $input = json_decode(file_get_contents('php://input'), true) ?? [];
         AuthController::bootSession();

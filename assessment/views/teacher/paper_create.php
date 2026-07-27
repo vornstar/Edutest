@@ -1,4 +1,5 @@
 <?php
+/** @var array $subjects */
 $__title = 'New paper';
 require __DIR__ . '/../partials/header.php';
 ?>
@@ -8,7 +9,17 @@ require __DIR__ . '/../partials/header.php';
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
 
         <label>Title <input type="text" name="title" required></label>
-        <label>Subject <input type="text" name="subject"></label>
+        <label>Subject
+            <select name="subject">
+                <option value="">&mdash; none &mdash;</option>
+                <?php foreach ($subjects as $s): ?>
+                    <option value="<?= htmlspecialchars($s['name']) ?>"><?= htmlspecialchars($s['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+        <?php if (!$subjects): ?>
+            <p class="autosave-status">No subjects set up yet - an admin can add some in Admin &gt; Subjects.</p>
+        <?php endif; ?>
         <label>Duration (minutes) <input type="number" name="duration_minutes" min="1"></label>
 
         <fieldset>

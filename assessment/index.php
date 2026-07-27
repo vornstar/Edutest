@@ -127,6 +127,10 @@ $routes = [
     ['POST', '/admin/users/{id}/managed-subject', [AdminController::class, 'setManagedSubject']],
     ['GET', '/admin/onedrive-lookup', [AdminController::class, 'oneDriveLookup']],
     ['GET', '/admin/audit', [AdminController::class, 'auditLog']],
+    ['GET', '/admin/subjects', [AdminController::class, 'subjects']],
+    ['POST', '/admin/subjects/add', [AdminController::class, 'addSubject']],
+    ['POST', '/admin/subjects/{id}/rename', [AdminController::class, 'renameSubject']],
+    ['POST', '/admin/subjects/{id}/delete', [AdminController::class, 'deleteSubject']],
 ];
 
 foreach ($routes as [$routeMethod, $pattern, $handler]) {

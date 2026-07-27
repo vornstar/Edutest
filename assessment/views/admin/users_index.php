@@ -1,6 +1,7 @@
 <?php
 /** @var array $users */
 /** @var string $query */
+/** @var array $subjects */
 $__title = 'User management';
 require __DIR__ . '/../partials/header.php';
 ?>
@@ -16,7 +17,7 @@ require __DIR__ . '/../partials/header.php';
         <?php endif; ?>
     </form>
     <table class="data-table">
-        <thead><tr><th>Name</th><th>Email</th><th>Signed in?</th><th>Current role</th><th>Change role</th><th>Managed subject</th></tr></thead>
+        <thead><tr><th>Name</th><th>Email</th><th>Signed in?</th><th>Current role</th><th>Change role</th><th>Subject</th></tr></thead>
         <tbody>
         <?php foreach ($users as $u): ?>
             <tr>
@@ -38,7 +39,12 @@ require __DIR__ . '/../partials/header.php';
                 <td>
                     <form method="post" action="/assessment/admin/users/<?= (int) $u['id'] ?>/managed-subject" style="display:flex;gap:0.4rem;">
                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
-                        <input type="text" name="managed_subject" value="<?= htmlspecialchars($u['managed_subject'] ?? '') ?>" placeholder="e.g. Maths" style="width:8rem;">
+                        <select name="managed_subject">
+                            <option value="">&mdash; none &mdash;</option>
+                            <?php foreach ($subjects as $s): ?>
+                                <option value="<?= htmlspecialchars($s['name']) ?>" <?= strcasecmp((string) $s['name'], (string) ($u['managed_subject'] ?? '')) === 0 ? 'selected' : '' ?>><?= htmlspecialchars($s['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
                         <button type="submit" class="btn">Set</button>
                     </form>
                 </td>
@@ -46,7 +52,12 @@ require __DIR__ . '/../partials/header.php';
         <?php endforeach; ?>
         </tbody>
     </table>
-    <p class="autosave-status">Managed subject is only used for the Subject Leader role - it must exactly match the "Subject" a paper was created under for that Subject Leader to manage/delete it.</p>
+    <p class="autosave-status">
+        Subject applies to Teacher and Subject Leader alike: it's what scopes which papers/tests they can
+        see (own papers plus anyone else's in the same subject). A Subject Leader additionally gets
+        manage/delete authority over the whole subject's papers, not just their own.
+        Manage the list of subjects on offer in <a href="/assessment/admin/subjects">Admin &gt; Subjects</a>.
+    </p>
 
     <h2>Add a user from your tenant</h2>
     <p>Pre-provision a colleague by email and assign their role now. It takes effect the moment they first sign in with Microsoft.</p>

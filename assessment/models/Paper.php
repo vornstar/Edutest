@@ -48,9 +48,11 @@ final class Paper
 
     /**
      * Papers a teacher-portal user can see in their own list: everything
-     * they created, plus - for a Subject Leader - everything under their
-     * managed subject too (department-wide oversight, SRS 3.2), plus -
-     * for an Admin - every paper on the platform.
+     * they created, plus everything else in their own subject (whether
+     * they're a Teacher or a Subject Leader - every teacher is scoped to
+     * their subject, a Subject Leader additionally gets manage/delete
+     * authority over the whole subject, see PaperController::canManagePaper),
+     * plus - for an Admin - every paper on the platform.
      */
     public static function visibleTo(array $user): array
     {
@@ -60,7 +62,7 @@ final class Paper
             return $pdo->query('SELECT * FROM papers ORDER BY created_at DESC')->fetchAll();
         }
 
-        if ($user['role'] === 'subject_leader' && !empty($user['managed_subject'])) {
+        if (in_array($user['role'], ['teacher', 'subject_leader'], true) && !empty($user['managed_subject'])) {
             $stmt = $pdo->prepare('SELECT * FROM papers WHERE created_by = :created_by OR subject = :subject ORDER BY created_at DESC');
             $stmt->execute(['created_by' => $user['id'], 'subject' => $user['managed_subject']]);
             return $stmt->fetchAll();

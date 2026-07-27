@@ -2,6 +2,7 @@
 /** @var array $paper */
 /** @var array $questions */
 /** @var bool $canDelete */
+/** @var bool $canManage */
 /** @var array|null $selfTest */
 /** @var array|null $selfTestSubmission */
 $__title = htmlspecialchars($paper['title']);
@@ -12,21 +13,26 @@ require __DIR__ . '/../partials/header.php';
         <h1><?= htmlspecialchars($paper['title']) ?></h1>
         <div>
             <a class="btn" href="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/preview" target="_blank">Preview as student</a>
-            <a class="btn" href="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/assign">Assign to class</a>
             <a class="btn" href="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/results">Results</a>
-            <?php if ($paper['status'] === 'draft'): ?>
-                <form method="post" action="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/publish" style="display:inline">
-                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
-                    <button type="submit" class="btn btn-primary">Publish</button>
-                </form>
+            <?php if (!$canManage): ?>
+                <span class="autosave-status" title="Created by a colleague in your subject - you can view it, but only they (or a Subject Leader) can edit or assign it.">View only</span>
             <?php endif; ?>
-            <?php if ($canDelete): ?>
-                <form method="post" action="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/delete" style="display:inline" onsubmit="return confirm('Delete this paper permanently, including all its questions? This cannot be undone.');">
-                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
-                    <button type="submit" class="btn btn-danger">Delete paper</button>
-                </form>
-            <?php else: ?>
-                <span class="autosave-status" title="Papers with student submissions can't be deleted.">Delete unavailable (has submissions)</span>
+            <?php if ($canManage): ?>
+                <a class="btn" href="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/assign">Assign to class</a>
+                <?php if ($paper['status'] === 'draft'): ?>
+                    <form method="post" action="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/publish" style="display:inline">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
+                        <button type="submit" class="btn btn-primary">Publish</button>
+                    </form>
+                <?php endif; ?>
+                <?php if ($canDelete): ?>
+                    <form method="post" action="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/delete" style="display:inline" onsubmit="return confirm('Delete this paper permanently, including all its questions? This cannot be undone.');">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
+                        <button type="submit" class="btn btn-danger">Delete paper</button>
+                    </form>
+                <?php else: ?>
+                    <span class="autosave-status" title="Papers with student submissions can't be deleted.">Delete unavailable (has submissions)</span>
+                <?php endif; ?>
             <?php endif; ?>
         </div>
     </div>
@@ -34,7 +40,7 @@ require __DIR__ . '/../partials/header.php';
     <p>Type: <?= htmlspecialchars($paper['type']) ?> &middot; Status: <?= htmlspecialchars($paper['status']) ?></p>
     <p class="autosave-status">Self-marking is set per-assignment now, not per-paper - see the class page for each assignment once it's been assigned.</p>
 
-    <?php if ($paper['type'] === 'pdf'): ?>
+    <?php if ($paper['type'] === 'pdf' && $canManage): ?>
         <form method="post" action="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/max-marks" style="display:flex;gap:0.5rem;align-items:flex-end;">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
             <label>Max marks (one overall score when marking, out of this)
@@ -42,6 +48,8 @@ require __DIR__ . '/../partials/header.php';
             </label>
             <button type="submit" class="btn">Save</button>
         </form>
+    <?php elseif ($paper['type'] === 'pdf'): ?>
+        <p>Max marks: <?= htmlspecialchars((string) ($paper['max_marks'] ?? '—')) ?></p>
     <?php endif; ?>
 
     <div class="question-block">
@@ -71,7 +79,9 @@ require __DIR__ . '/../partials/header.php';
             <?php if ($paper['pdf_drive_item_id']): ?><a href="/assessment/files/papers/<?= (int) $paper['id'] ?>/paper" target="_blank">View exam paper PDF</a><?php endif; ?>
             <?php if ($paper['mark_scheme_drive_item_id']): ?> &middot; <a href="/assessment/files/papers/<?= (int) $paper['id'] ?>/markscheme" target="_blank">View mark scheme PDF</a><?php endif; ?>
         </p>
+    <?php endif; ?>
 
+    <?php if ($paper['type'] === 'pdf' && $canManage): ?>
         <h2>Replace PDF files</h2>
         <p>Upload a new file for either slot to replace what's currently stored - leave a slot empty to keep its existing file.</p>
         <form method="post" action="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/update-pdf" enctype="multipart/form-data">
@@ -82,7 +92,7 @@ require __DIR__ . '/../partials/header.php';
         </form>
     <?php endif; ?>
 
-    <?php if ($paper['type'] === 'digital'): ?>
+    <?php if ($paper['type'] === 'digital' && $canManage): ?>
     <h2>Questions (answer booklet structure)</h2>
     <table class="data-table">
         <thead><tr><th>#</th><th>Section</th><th>Type</th><th>Text</th><th>Max marks</th></tr></thead>
@@ -130,6 +140,25 @@ require __DIR__ . '/../partials/header.php';
         <input type="file" name="csv_file" accept=".csv" required>
         <button type="submit" class="btn">Import CSV</button>
     </form>
+    <?php elseif ($paper['type'] === 'digital'): ?>
+    <h2>Questions (answer booklet structure)</h2>
+    <table class="data-table">
+        <thead><tr><th>#</th><th>Section</th><th>Type</th><th>Text</th><th>Max marks</th></tr></thead>
+        <tbody>
+        <?php foreach ($questions as $q): ?>
+            <tr>
+                <td><?= (int) $q['order_index'] ?></td>
+                <td><?= htmlspecialchars($q['section'] ?? '') ?></td>
+                <td><?= htmlspecialchars($q['type']) ?></td>
+                <td><?= htmlspecialchars(mb_strimwidth($q['question_text'], 0, 80, '…')) ?></td>
+                <td><?= htmlspecialchars((string) $q['max_marks']) ?></td>
+            </tr>
+        <?php endforeach; ?>
+        <?php if (!$questions): ?>
+            <tr><td colspan="5">No questions yet.</td></tr>
+        <?php endif; ?>
+        </tbody>
+    </table>
     <?php endif; ?>
 </div>
 <?php require __DIR__ . '/../partials/footer.php'; ?>

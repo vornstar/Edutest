@@ -1,6 +1,6 @@
 <?php
 /** @var array $rows */
-$__title = 'Department results';
+$__title = 'Subject results';
 require __DIR__ . '/../partials/header.php';
 
 $statusLabels = [
@@ -13,8 +13,8 @@ $statusLabels = [
 ];
 ?>
 <div class="panel">
-    <h1>Department results</h1>
-    <p class="autosave-status">Every student result across every paper in your subject area, including papers assigned by other teachers.</p>
+    <h1>Subject results</h1>
+    <p class="autosave-status">Every student result across every paper you can see (your own, plus anyone else's in your subject) - see the Papers page if you're not sure which papers that includes.</p>
 
     <table class="data-table">
         <thead><tr><th>Paper</th><th>Assigned by</th><th>Class</th><th>Student</th><th>Status</th><th>Score</th></tr></thead>
