@@ -4,8 +4,10 @@
 -- see models/User.php for how identity is synced in from the shared PHP
 -- session set by the site-wide root auth_handler.php.
 --
--- All tables use InnoDB. Sensitive columns (mark schemes, model answers) are
--- stored as VARBINARY and encrypted/decrypted in the application layer with
+-- All tables use InnoDB. Every column holding actual student work or marker
+-- feedback (mark schemes, model answers, typed/handwritten answers, in-PDF
+-- annotations, self-mark reflections, marker comments) is stored as a
+-- MEDIUMBLOB and encrypted/decrypted in the application layer with
 -- AES-256-GCM (see models/Crypto.php). Do not store encryption keys in this DB.
 
 SET NAMES utf8mb4;
@@ -120,7 +122,7 @@ CREATE TABLE IF NOT EXISTS answers (
     id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     submission_id  INT UNSIGNED NOT NULL,
     question_id    INT UNSIGNED NOT NULL,
-    answer_text    MEDIUMTEXT NULL,
+    answer_cipher  MEDIUMBLOB NULL COMMENT 'AES-256-GCM encrypted student answer text',
     autosaved_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uq_submission_question (submission_id, question_id),
     CONSTRAINT fk_answers_submission FOREIGN KEY (submission_id) REFERENCES submissions(id) ON DELETE CASCADE,
@@ -132,7 +134,7 @@ CREATE TABLE IF NOT EXISTS self_marks (
     submission_id       INT UNSIGNED NOT NULL,
     question_id         INT UNSIGNED NOT NULL,
     student_mark        DECIMAL(5,2) NOT NULL,
-    reflection_comment  TEXT NULL,
+    reflection_cipher   MEDIUMBLOB NULL COMMENT 'AES-256-GCM encrypted student reflection comment',
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uq_selfmark (submission_id, question_id),
     CONSTRAINT fk_selfmark_submission FOREIGN KEY (submission_id) REFERENCES submissions(id) ON DELETE CASCADE,
@@ -146,7 +148,7 @@ CREATE TABLE IF NOT EXISTS marks (
     marker_id      INT UNSIGNED NOT NULL,
     mark_type      ENUM('primary','moderation') NOT NULL DEFAULT 'primary',
     score          DECIMAL(5,2) NOT NULL,
-    comment        TEXT NULL,
+    comment_cipher MEDIUMBLOB NULL COMMENT 'AES-256-GCM encrypted marker comment',
     created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     KEY idx_marks_submission (submission_id),
     CONSTRAINT fk_marks_submission FOREIGN KEY (submission_id) REFERENCES submissions(id) ON DELETE CASCADE,
@@ -159,7 +161,7 @@ CREATE TABLE IF NOT EXISTS annotations (
     submission_id  INT UNSIGNED NOT NULL,
     page_number    INT UNSIGNED NOT NULL DEFAULT 1,
     marker_id      INT UNSIGNED NOT NULL,
-    data_json      MEDIUMTEXT NOT NULL COMMENT 'Fabric.js/PDF.js vector overlay JSON',
+    data_cipher    MEDIUMBLOB NOT NULL COMMENT 'AES-256-GCM encrypted Fabric.js/PDF.js vector overlay JSON',
     flattened      TINYINT(1) NOT NULL DEFAULT 0,
     updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uq_submission_page_marker (submission_id, page_number, marker_id),

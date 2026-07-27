@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/AuditLog.php';
+require_once __DIR__ . '/Crypto.php';
 
 final class Mark
 {
@@ -10,12 +11,14 @@ final class Mark
      * Teacher records/overwrites a score for a question on a submission.
      * Every write is preserved (not updated in place) so the audit trail
      * retains the full history of primary marks and moderation adjustments.
+     * The comment is about a specific student's work, so it's encrypted at
+     * rest like every other piece of student content.
      */
     public static function record(int $submissionId, int $questionId, int $markerId, float $score, ?string $comment, string $type = 'primary'): int
     {
         $stmt = Database::connection()->prepare(
-            'INSERT INTO marks (submission_id, question_id, marker_id, mark_type, score, comment)
-             VALUES (:submission_id, :question_id, :marker_id, :mark_type, :score, :comment)'
+            'INSERT INTO marks (submission_id, question_id, marker_id, mark_type, score, comment_cipher)
+             VALUES (:submission_id, :question_id, :marker_id, :mark_type, :score, :comment_cipher)'
         );
         $stmt->execute([
             'submission_id' => $submissionId,
@@ -23,7 +26,7 @@ final class Mark
             'marker_id' => $markerId,
             'mark_type' => $type,
             'score' => $score,
-            'comment' => $comment,
+            'comment_cipher' => Crypto::encrypt($comment),
         ]);
         $id = (int) Database::connection()->lastInsertId();
 
@@ -51,7 +54,7 @@ final class Mark
         $rows = $stmt->fetchAll();
         $byQuestion = [];
         foreach ($rows as $row) {
-            $byQuestion[(int) $row['question_id']] = $row;
+            $byQuestion[(int) $row['question_id']] = self::withDecryptedComment($row);
         }
         return $byQuestion;
     }
@@ -64,7 +67,14 @@ final class Mark
              WHERE m.submission_id = :submission_id ORDER BY m.created_at ASC'
         );
         $stmt->execute(['submission_id' => $submissionId]);
-        return $stmt->fetchAll();
+        return array_map([self::class, 'withDecryptedComment'], $stmt->fetchAll());
+    }
+
+    private static function withDecryptedComment(array $row): array
+    {
+        $row['comment'] = Crypto::decrypt($row['comment_cipher']);
+        unset($row['comment_cipher']);
+        return $row;
     }
 
     public static function totalScore(int $submissionId, string $type = 'primary'): float

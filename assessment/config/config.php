@@ -38,10 +38,17 @@ $GLOBALS['__assessment_config'] = [
         'pass' => env('ASSESSMENT_DB_PASSWORD'),
     ],
 
-    // AES-256-GCM key used only for mark scheme / model answer encryption
-    // (see models/Crypto.php). Must be set in .env.php before first use - once
+    // AES-256-GCM key used for every piece of encrypted-at-rest student
+    // content: mark schemes/model answers, typed answers, in-PDF
+    // annotations, self-mark reflections, marker comments (see
+    // models/Crypto.php). Must be set in .env.php before first use - once
     // data is encrypted with it, changing it makes that data unreadable.
     'encryption_key' => env('ASSESSMENT_ENCRYPTION_KEY'),
+
+    // Only used by the one-off migrate_encrypt.php script (see
+    // config/migrate_encrypt.sql) - a shared secret so that script can't be
+    // triggered by a random visitor. Not needed for normal operation.
+    'migration_secret' => env('ASSESSMENT_MIGRATION_SECRET', ''),
 
     // Same Microsoft Entra ID app registration the root auth_handler.php
     // uses, purely so this service can silently refresh the session's

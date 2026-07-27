@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/Database.php';
+require_once __DIR__ . '/Crypto.php';
 
 final class Submission
 {
@@ -36,15 +37,17 @@ final class Submission
         return $stmt->fetch() ?: null;
     }
 
+    /** Student answer text is encrypted at rest (AES-256-GCM, see Crypto) - only ever decrypted in memory for authorized display. */
     public static function autosaveAnswer(int $submissionId, int $questionId, string $answerText): void
     {
         $stmt = Database::connection()->prepare(
-            'INSERT INTO answers (submission_id, question_id, answer_text) VALUES (:submission_id, :question_id, :answer_text)
-             ON DUPLICATE KEY UPDATE answer_text = VALUES(answer_text), autosaved_at = NOW()'
+            'INSERT INTO answers (submission_id, question_id, answer_cipher) VALUES (:submission_id, :question_id, :answer_cipher)
+             ON DUPLICATE KEY UPDATE answer_cipher = VALUES(answer_cipher), autosaved_at = NOW()'
         );
-        $stmt->execute(['submission_id' => $submissionId, 'question_id' => $questionId, 'answer_text' => $answerText]);
+        $stmt->execute(['submission_id' => $submissionId, 'question_id' => $questionId, 'answer_cipher' => Crypto::encrypt($answerText)]);
     }
 
+    /** @return array<int,array> keyed by question_id, each row's 'answer_text' decrypted transparently */
     public static function answers(int $submissionId): array
     {
         $stmt = Database::connection()->prepare('SELECT * FROM answers WHERE submission_id = :submission_id');
@@ -52,6 +55,8 @@ final class Submission
         $rows = $stmt->fetchAll();
         $byQuestion = [];
         foreach ($rows as $row) {
+            $row['answer_text'] = Crypto::decrypt($row['answer_cipher']);
+            unset($row['answer_cipher']);
             $byQuestion[(int) $row['question_id']] = $row;
         }
         return $byQuestion;
@@ -80,18 +85,19 @@ final class Submission
     public static function recordSelfMark(int $submissionId, int $questionId, float $studentMark, ?string $reflection): void
     {
         $stmt = Database::connection()->prepare(
-            'INSERT INTO self_marks (submission_id, question_id, student_mark, reflection_comment)
-             VALUES (:submission_id, :question_id, :student_mark, :reflection)
-             ON DUPLICATE KEY UPDATE student_mark = VALUES(student_mark), reflection_comment = VALUES(reflection_comment)'
+            'INSERT INTO self_marks (submission_id, question_id, student_mark, reflection_cipher)
+             VALUES (:submission_id, :question_id, :student_mark, :reflection_cipher)
+             ON DUPLICATE KEY UPDATE student_mark = VALUES(student_mark), reflection_cipher = VALUES(reflection_cipher)'
         );
         $stmt->execute([
             'submission_id' => $submissionId,
             'question_id' => $questionId,
             'student_mark' => $studentMark,
-            'reflection' => $reflection,
+            'reflection_cipher' => Crypto::encrypt($reflection),
         ]);
     }
 
+    /** @return array<int,array> keyed by question_id, each row's 'reflection_comment' decrypted transparently */
     public static function selfMarks(int $submissionId): array
     {
         $stmt = Database::connection()->prepare('SELECT * FROM self_marks WHERE submission_id = :submission_id');
@@ -99,6 +105,8 @@ final class Submission
         $rows = $stmt->fetchAll();
         $byQuestion = [];
         foreach ($rows as $row) {
+            $row['reflection_comment'] = Crypto::decrypt($row['reflection_cipher']);
+            unset($row['reflection_cipher']);
             $byQuestion[(int) $row['question_id']] = $row;
         }
         return $byQuestion;
