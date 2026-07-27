@@ -14,7 +14,19 @@ final class AdminController
     public static function users(): void
     {
         AuthController::requireRole([User::ROLE_ADMIN]);
-        $users = User::all();
+        $query = trim((string) ($_GET['q'] ?? ''));
+
+        // display_name is encrypted at rest (see User::hydrate), so this can't be a SQL WHERE/LIKE -
+        // fetch (a generously bounded, school-scale) full list, already decrypted, and filter in PHP.
+        $users = User::all(5000);
+        if ($query !== '') {
+            $needle = mb_strtolower($query);
+            $users = array_values(array_filter(
+                $users,
+                static fn(array $u): bool => str_contains(mb_strtolower($u['display_name']), $needle)
+            ));
+        }
+
         require __DIR__ . '/../views/admin/users_index.php';
     }
 

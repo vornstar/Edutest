@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/Mark.php';
 require_once __DIR__ . '/AuditLog.php';
+require_once __DIR__ . '/Crypto.php';
 
 final class Moderation
 {
@@ -41,13 +42,17 @@ final class Moderation
     public static function forSecondaryMarker(int $userId): array
     {
         $stmt = Database::connection()->prepare(
-            'SELECT ma.*, s.assignment_id, u.display_name AS student_name FROM moderation_assignments ma
+            'SELECT ma.*, s.assignment_id, u.display_name_cipher AS student_name_cipher FROM moderation_assignments ma
              INNER JOIN submissions s ON s.id = ma.submission_id
              INNER JOIN users u ON u.id = s.student_id
              WHERE ma.secondary_marker_id = :user_id ORDER BY ma.created_at DESC'
         );
         $stmt->execute(['user_id' => $userId]);
-        return $stmt->fetchAll();
+        return array_map(static function (array $row): array {
+            $row['student_name'] = Crypto::decrypt($row['student_name_cipher']);
+            unset($row['student_name_cipher']);
+            return $row;
+        }, $stmt->fetchAll());
     }
 
     /**

@@ -1,10 +1,20 @@
 <?php
 /** @var array $users */
+/** @var string $query */
 $__title = 'User management';
 require __DIR__ . '/../partials/header.php';
 ?>
 <div class="panel">
     <h1>Users &amp; roles</h1>
+    <form method="get" action="/assessment/admin/users">
+        <label>Search by name
+            <input type="text" name="q" value="<?= htmlspecialchars($query) ?>" placeholder="e.g. Smith">
+        </label>
+        <button type="submit" class="btn">Search</button>
+        <?php if ($query !== ''): ?>
+            <a class="btn" href="/assessment/admin/users">Clear</a>
+        <?php endif; ?>
+    </form>
     <table class="data-table">
         <thead><tr><th>Name</th><th>Email</th><th>Signed in?</th><th>Current role</th><th>Change role</th><th>Managed subject</th></tr></thead>
         <tbody>

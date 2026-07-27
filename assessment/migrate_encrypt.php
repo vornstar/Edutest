@@ -51,6 +51,25 @@ function migrateColumn(PDO $pdo, string $table, string $idCol, string $plainCol,
     return $count;
 }
 
+/** users needs both email_cipher AND the deterministic email_hash (for login lookup/uniqueness) computed together, plus display_name_cipher - different shape from migrateColumn(). */
+function migrateUsers(PDO $pdo): int
+{
+    $count = 0;
+    $select = $pdo->query('SELECT id, email, display_name FROM users WHERE email_cipher IS NULL');
+    $update = $pdo->prepare('UPDATE users SET email_cipher = :email_cipher, email_hash = :email_hash, display_name_cipher = :display_name_cipher WHERE id = :id');
+    foreach ($select->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $email = strtolower(trim((string) $row['email']));
+        $update->execute([
+            'email_cipher' => Crypto::encrypt($email),
+            'email_hash' => Crypto::searchHash($email),
+            'display_name_cipher' => Crypto::encrypt((string) $row['display_name']),
+            'id' => $row['id'],
+        ]);
+        $count++;
+    }
+    return $count;
+}
+
 $pdo = Database::connection();
 
 echo "Encrypting existing plaintext data...\n\n";
@@ -58,6 +77,7 @@ echo "answers.answer_text            -> answer_cipher:     " . migrateColumn($pd
 echo "self_marks.reflection_comment  -> reflection_cipher:  " . migrateColumn($pdo, 'self_marks', 'id', 'reflection_comment', 'reflection_cipher') . " row(s)\n";
 echo "marks.comment                  -> comment_cipher:     " . migrateColumn($pdo, 'marks', 'id', 'comment', 'comment_cipher') . " row(s)\n";
 echo "annotations.data_json          -> data_cipher:        " . migrateColumn($pdo, 'annotations', 'id', 'data_json', 'data_cipher') . " row(s)\n";
+echo "users.email/display_name       -> email_cipher/email_hash/display_name_cipher: " . migrateUsers($pdo) . " row(s)\n";
 
 echo "\nDone. Next steps:\n";
 echo "1. Spot-check the app still shows correct answers/comments/annotations for a real submission.\n";

@@ -118,15 +118,22 @@ final class Submission
         self::setStatus($submissionId, 'pending_moderation');
     }
 
+    /** student_name is encrypted (users.display_name_cipher) so it can't be sorted in SQL - decrypted then re-sorted alphabetically here instead. */
     public static function forAssignment(int $assignmentId): array
     {
         $stmt = Database::connection()->prepare(
-            'SELECT s.*, u.display_name AS student_name FROM submissions s
+            'SELECT s.*, u.display_name_cipher AS student_name_cipher FROM submissions s
              INNER JOIN users u ON u.id = s.student_id
-             WHERE s.assignment_id = :assignment_id ORDER BY u.display_name'
+             WHERE s.assignment_id = :assignment_id'
         );
         $stmt->execute(['assignment_id' => $assignmentId]);
-        return $stmt->fetchAll();
+        $rows = array_map(static function (array $row): array {
+            $row['student_name'] = Crypto::decrypt($row['student_name_cipher']);
+            unset($row['student_name_cipher']);
+            return $row;
+        }, $stmt->fetchAll());
+        usort($rows, static fn($a, $b) => strcasecmp($a['student_name'], $b['student_name']));
+        return $rows;
     }
 
     public static function forStudent(int $studentId): array

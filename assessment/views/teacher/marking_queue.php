@@ -1,6 +1,7 @@
 <?php
 /** @var array $papers */
 require_once __DIR__ . '/../../models/Database.php';
+require_once __DIR__ . '/../../models/Crypto.php';
 $__title = 'Marking queue';
 require __DIR__ . '/../partials/header.php';
 ?>
@@ -17,7 +18,7 @@ require __DIR__ . '/../partials/header.php';
         foreach ($papers as $paper) {
             $pdo = Database::connection();
             $stmt = $pdo->prepare(
-                'SELECT s.*, u.display_name AS student_name, p.title AS paper_title, a.class_id FROM submissions s
+                'SELECT s.*, u.display_name_cipher AS student_name_cipher, p.title AS paper_title, a.class_id FROM submissions s
                  INNER JOIN test_assignments a ON a.id = s.assignment_id
                  INNER JOIN users u ON u.id = s.student_id
                  INNER JOIN papers p ON p.id = a.paper_id
@@ -25,7 +26,11 @@ require __DIR__ . '/../partials/header.php';
                  ORDER BY s.submitted_at'
             );
             $stmt->execute(['paper_id' => $paper['id']]);
-            $rows = array_merge($rows, $stmt->fetchAll());
+            foreach ($stmt->fetchAll() as $row) {
+                $row['student_name'] = Crypto::decrypt($row['student_name_cipher']);
+                unset($row['student_name_cipher']);
+                $rows[] = $row;
+            }
         }
         ?>
         <?php foreach ($rows as $row): ?>

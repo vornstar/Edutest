@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/Database.php';
+require_once __DIR__ . '/User.php';
 
 final class ClassRoster
 {
@@ -74,16 +75,18 @@ final class ClassRoster
         $stmt->execute(['class_id' => $classId, 'user_id' => $userId]);
     }
 
+    /** display_name is encrypted (see User::hydrate) so it can't be sorted in SQL - decrypted then re-sorted alphabetically here instead. */
     public static function students(int $classId): array
     {
         $stmt = Database::connection()->prepare(
             'SELECT u.* FROM users u
              INNER JOIN class_enrollments ce ON ce.user_id = u.id
-             WHERE ce.class_id = :class_id AND ce.role_in_class = "student"
-             ORDER BY u.display_name'
+             WHERE ce.class_id = :class_id AND ce.role_in_class = "student"'
         );
         $stmt->execute(['class_id' => $classId]);
-        return $stmt->fetchAll();
+        $students = array_map([User::class, 'hydrate'], $stmt->fetchAll());
+        usort($students, static fn($a, $b) => strcasecmp($a['display_name'], $b['display_name']));
+        return $students;
     }
 
     public static function isMember(int $classId, int $userId): bool

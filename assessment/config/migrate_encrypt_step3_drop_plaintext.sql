@@ -16,3 +16,14 @@ ALTER TABLE annotations DROP COLUMN data_json;
 -- writes a row without it) - tighten it to NOT NULL now that every
 -- existing row has been migrated, matching a fresh install's schema.
 ALTER TABLE annotations MODIFY COLUMN data_cipher MEDIUMBLOB NOT NULL;
+
+-- users: drop the old unique index + plaintext columns, add the new
+-- hash-based unique index, and tighten the new columns to NOT NULL now
+-- that every existing row has an encrypted email/display_name.
+ALTER TABLE users DROP INDEX uq_email;
+ALTER TABLE users DROP COLUMN email;
+ALTER TABLE users DROP COLUMN display_name;
+ALTER TABLE users MODIFY COLUMN email_cipher MEDIUMBLOB NOT NULL;
+ALTER TABLE users MODIFY COLUMN email_hash CHAR(64) NOT NULL;
+ALTER TABLE users MODIFY COLUMN display_name_cipher MEDIUMBLOB NOT NULL;
+ALTER TABLE users ADD UNIQUE KEY uq_email_hash (email_hash);

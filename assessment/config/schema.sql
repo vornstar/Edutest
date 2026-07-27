@@ -23,16 +23,17 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- defaults to 'student' - the roster sync and login sync paths never
 -- elevate a role on their own, only Admin > Users does.
 CREATE TABLE IF NOT EXISTS users (
-    id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    site_user_id    INT UNSIGNED NULL,
-    email           VARCHAR(255) NOT NULL,
-    display_name    VARCHAR(255) NOT NULL,
+    id                   INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    site_user_id         INT UNSIGNED NULL,
+    email_cipher         MEDIUMBLOB NOT NULL COMMENT 'AES-256-GCM encrypted email address',
+    email_hash           CHAR(64) NOT NULL COMMENT 'HMAC-SHA256 of the normalized email (see Crypto::searchHash) - used for exact-match lookup and uniqueness in place of the (non-deterministic) ciphertext',
+    display_name_cipher  MEDIUMBLOB NOT NULL COMMENT 'AES-256-GCM encrypted display name',
     role            ENUM('student','teacher','subject_leader','data','admin') NOT NULL DEFAULT 'student',
     managed_subject VARCHAR(128) NULL COMMENT 'For subject_leader: which papers.subject they have department-wide authority over (set by Admin)',
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uq_site_user (site_user_id),
-    UNIQUE KEY uq_email (email)
+    UNIQUE KEY uq_email_hash (email_hash)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS classes (

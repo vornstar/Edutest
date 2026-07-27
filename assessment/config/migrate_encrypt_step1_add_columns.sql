@@ -17,3 +17,14 @@ ALTER TABLE marks
 
 ALTER TABLE annotations
     ADD COLUMN data_cipher MEDIUMBLOB NULL COMMENT 'AES-256-GCM encrypted Fabric.js/PDF.js vector overlay JSON' AFTER marker_id;
+
+-- Every user's email and display name are identifiable personal data, so
+-- they get the same treatment as student work: encrypted, plus a keyed
+-- HMAC (email_hash) standing in for the plaintext email wherever the app
+-- needs an exact-match lookup or a uniqueness constraint - AES-256-GCM's
+-- ciphertext can't be used for either, since its random nonce makes the
+-- same plaintext encrypt differently every time.
+ALTER TABLE users
+    ADD COLUMN email_cipher MEDIUMBLOB NULL COMMENT 'AES-256-GCM encrypted email address' AFTER site_user_id,
+    ADD COLUMN email_hash CHAR(64) NULL COMMENT 'HMAC-SHA256 of the normalized email - for lookup/uniqueness' AFTER email_cipher,
+    ADD COLUMN display_name_cipher MEDIUMBLOB NULL COMMENT 'AES-256-GCM encrypted display name' AFTER email_hash;

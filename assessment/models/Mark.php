@@ -62,12 +62,17 @@ final class Mark
     public static function history(int $submissionId): array
     {
         $stmt = Database::connection()->prepare(
-            'SELECT m.*, u.display_name AS marker_name FROM marks m
+            'SELECT m.*, u.display_name_cipher AS marker_name_cipher FROM marks m
              INNER JOIN users u ON u.id = m.marker_id
              WHERE m.submission_id = :submission_id ORDER BY m.created_at ASC'
         );
         $stmt->execute(['submission_id' => $submissionId]);
-        return array_map([self::class, 'withDecryptedComment'], $stmt->fetchAll());
+        return array_map(static function (array $row): array {
+            $row = self::withDecryptedComment($row);
+            $row['marker_name'] = Crypto::decrypt($row['marker_name_cipher']);
+            unset($row['marker_name_cipher']);
+            return $row;
+        }, $stmt->fetchAll());
     }
 
     private static function withDecryptedComment(array $row): array
