@@ -106,6 +106,7 @@ $routes = [
     ['GET', '/admin/users', [AdminController::class, 'users']],
     ['POST', '/admin/users/add', [AdminController::class, 'addUser']],
     ['POST', '/admin/users/{id}/role', [AdminController::class, 'setRole']],
+    ['GET', '/admin/onedrive-lookup', [AdminController::class, 'oneDriveLookup']],
     ['GET', '/admin/audit', [AdminController::class, 'auditLog']],
 ];
 

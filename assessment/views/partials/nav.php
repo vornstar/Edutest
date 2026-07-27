@@ -24,5 +24,6 @@ $roleId = $__user['role'];
 <?php if ($roleId === User::ROLE_ADMIN): ?>
     <a href="/assessment/admin/users">Users</a>
     <a href="/assessment/admin/audit">Audit log</a>
+    <a href="/assessment/admin/onedrive-lookup">OneDrive setup</a>
     <a href="/assessment/data">Reports</a>
 <?php endif; ?>
