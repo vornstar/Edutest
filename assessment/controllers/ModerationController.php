@@ -19,7 +19,7 @@ final class ModerationController
 {
     public static function allocateForm(int $submissionId): void
     {
-        AuthController::requireRole([User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER]);
+        AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         $submission = Submission::find($submissionId);
         if (!$submission) {
             http_response_code(404);
@@ -30,7 +30,7 @@ final class ModerationController
 
     public static function allocate(int $submissionId): void
     {
-        $user = AuthController::requireRole([User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER]);
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         AuthController::verifyCsrf();
 
         $submission = Submission::find($submissionId);
@@ -57,14 +57,14 @@ final class ModerationController
 
     public static function myQueue(): void
     {
-        $user = AuthController::requireRole([User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER]);
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         $items = Moderation::forSecondaryMarker((int) $user['id']);
         require __DIR__ . '/../views/teacher/moderation_queue.php';
     }
 
     public static function review(int $moderationId): void
     {
-        $user = AuthController::requireRole([User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER]);
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         $moderation = Moderation::find($moderationId);
         if (!$moderation || (int) $moderation['secondary_marker_id'] !== (int) $user['id']) {
             http_response_code(404);
@@ -92,7 +92,7 @@ final class ModerationController
 
     public static function submitReview(int $moderationId): void
     {
-        $user = AuthController::requireRole([User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER]);
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         AuthController::verifyCsrf();
 
         $moderation = Moderation::find($moderationId);

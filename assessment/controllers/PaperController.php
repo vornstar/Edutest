@@ -15,20 +15,20 @@ final class PaperController
 {
     public static function index(): void
     {
-        $user = AuthController::requireRole([User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER]);
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         $papers = Paper::byCreator((int) $user['id']);
         require __DIR__ . '/../views/teacher/papers_index.php';
     }
 
     public static function createForm(): void
     {
-        AuthController::requireRole([User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER]);
+        AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         require __DIR__ . '/../views/teacher/paper_create.php';
     }
 
     public static function store(): void
     {
-        $user = AuthController::requireRole([User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER]);
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         AuthController::verifyCsrf();
 
         $type = ($_POST['type'] ?? 'digital') === 'pdf' ? 'pdf' : 'digital';
@@ -85,7 +85,7 @@ final class PaperController
 
     public static function show(int $paperId): void
     {
-        $user = AuthController::requireRole([User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER]);
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         $paper = Paper::find($paperId);
         if (!$paper || (int) $paper['created_by'] !== (int) $user['id']) {
             http_response_code(404);
@@ -97,7 +97,7 @@ final class PaperController
 
     public static function addQuestion(int $paperId): void
     {
-        $user = AuthController::requireRole([User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER]);
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         AuthController::verifyCsrf();
 
         $paper = Paper::find($paperId);
@@ -135,7 +135,7 @@ final class PaperController
      */
     public static function bulkImport(int $paperId): void
     {
-        $user = AuthController::requireRole([User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER]);
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         AuthController::verifyCsrf();
 
         $paper = Paper::find($paperId);
@@ -190,7 +190,7 @@ final class PaperController
 
     public static function publish(int $paperId): void
     {
-        $user = AuthController::requireRole([User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER]);
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         AuthController::verifyCsrf();
 
         $paper = Paper::find($paperId);

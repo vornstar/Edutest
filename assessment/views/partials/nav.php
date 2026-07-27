@@ -6,7 +6,7 @@ $roleId = $__user['role'];
     <a href="/assessment/student">My tests</a>
 <?php endif; ?>
 
-<?php if (in_array($roleId, [User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER], true)): ?>
+<?php if (in_array($roleId, User::TEACHER_PORTAL_ROLES, true)): ?>
     <a href="/assessment/teacher/papers">Papers</a>
     <a href="/assessment/teacher/classes">Classes</a>
     <a href="/assessment/teacher/marking">Marking</a>

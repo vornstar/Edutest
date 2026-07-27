@@ -17,7 +17,7 @@ final class TestController
 
     public static function assignForm(int $paperId): void
     {
-        $user = AuthController::requireRole([User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER]);
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         $paper = Paper::find($paperId);
         if (!$paper) {
             http_response_code(404);
@@ -29,7 +29,7 @@ final class TestController
 
     public static function assign(int $paperId): void
     {
-        $user = AuthController::requireRole([User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER]);
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         AuthController::verifyCsrf();
 
         $classId = (int) ($_POST['class_id'] ?? 0);

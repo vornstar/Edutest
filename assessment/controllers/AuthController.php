@@ -76,7 +76,7 @@ final class AuthController
 
     public static function isTeacherLike(array $user): bool
     {
-        return in_array($user['role'], [User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER], true);
+        return in_array($user['role'], User::TEACHER_PORTAL_ROLES, true);
     }
 
     public static function csrfToken(): string

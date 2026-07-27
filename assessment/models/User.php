@@ -19,6 +19,19 @@ final class User
         self::ROLE_ADMIN,
     ];
 
+    /**
+     * Roles that can access the Teacher portal (create/mark papers, manage
+     * classes, moderate). Per the SRS, Admin has full system access - it
+     * isn't a separate silo from Teacher/Subject Leader, it's a superset -
+     * so real staff who are also admins (very common in a small school)
+     * aren't locked out of the Teacher portal just for being admin too.
+     */
+    public const TEACHER_PORTAL_ROLES = [
+        self::ROLE_TEACHER,
+        self::ROLE_SUBJECT_LEADER,
+        self::ROLE_ADMIN,
+    ];
+
     public static function find(int $id): ?array
     {
         $stmt = Database::connection()->prepare('SELECT * FROM users WHERE id = :id');

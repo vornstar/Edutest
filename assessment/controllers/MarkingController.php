@@ -19,14 +19,14 @@ final class MarkingController
 {
     public static function queue(): void
     {
-        $user = AuthController::requireRole([User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER]);
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         $papers = Paper::byCreator((int) $user['id']);
         require __DIR__ . '/../views/teacher/marking_queue.php';
     }
 
     public static function markSubmission(int $submissionId): void
     {
-        $user = AuthController::requireRole([User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER]);
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
 
         $submission = Submission::find($submissionId);
         if (!$submission) {
@@ -53,7 +53,7 @@ final class MarkingController
 
     public static function saveMark(int $submissionId): void
     {
-        $user = AuthController::requireRole([User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER]);
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         AuthController::verifyCsrf();
 
         foreach ((array) ($_POST['scores'] ?? []) as $questionId => $score) {
@@ -72,7 +72,7 @@ final class MarkingController
     /** Persists a Fabric.js/PDF.js vector overlay for one page as JSON. */
     public static function saveAnnotation(int $submissionId): void
     {
-        $user = AuthController::requireRole([User::ROLE_TEACHER, User::ROLE_SUBJECT_LEADER]);
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
 
         $input = json_decode(file_get_contents('php://input'), true) ?? [];
         AuthController::bootSession();
