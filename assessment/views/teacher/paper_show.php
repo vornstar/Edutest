@@ -9,6 +9,7 @@ require __DIR__ . '/../partials/header.php';
     <div class="panel-header">
         <h1><?= htmlspecialchars($paper['title']) ?></h1>
         <div>
+            <a class="btn" href="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/preview" target="_blank">Preview as student</a>
             <a class="btn" href="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/assign">Assign to class</a>
             <?php if ($paper['status'] === 'draft'): ?>
                 <form method="post" action="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/publish" style="display:inline">

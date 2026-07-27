@@ -18,7 +18,7 @@ require __DIR__ . '/../partials/header.php';
 
     <h2>Assigned tests</h2>
     <table class="data-table">
-        <thead><tr><th>Paper</th><th>Type</th><th>Due</th><th>Teams-synced</th></tr></thead>
+        <thead><tr><th>Paper</th><th>Type</th><th>Due</th><th>Teams-synced</th><th></th></tr></thead>
         <tbody>
         <?php foreach ($assignments as $a): ?>
             <tr>
@@ -26,10 +26,11 @@ require __DIR__ . '/../partials/header.php';
                 <td><?= htmlspecialchars($a['type']) ?></td>
                 <td><?= htmlspecialchars($a['due_at'] ?? '—') ?></td>
                 <td><?= $a['teams_assignment_id'] ? 'Yes' : 'No' ?></td>
+                <td><a href="/assessment/teacher/papers/<?= (int) $a['paper_id'] ?>/preview" target="_blank">Preview as student</a></td>
             </tr>
         <?php endforeach; ?>
         <?php if (!$assignments): ?>
-            <tr><td colspan="4">No tests assigned to this class yet.</td></tr>
+            <tr><td colspan="5">No tests assigned to this class yet.</td></tr>
         <?php endif; ?>
         </tbody>
     </table>

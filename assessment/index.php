@@ -77,6 +77,7 @@ $routes = [
     ['POST', '/teacher/papers/{id}/publish', [PaperController::class, 'publish']],
     ['POST', '/teacher/papers/{id}/update-pdf', [PaperController::class, 'updatePdf']],
     ['POST', '/teacher/papers/{id}/delete', [PaperController::class, 'destroy']],
+    ['GET', '/teacher/papers/{id}/preview', [TestController::class, 'preview']],
     ['GET', '/teacher/papers/{id}/assign', [TestController::class, 'assignForm']],
     ['POST', '/teacher/papers/{id}/assign', [TestController::class, 'assign']],
 

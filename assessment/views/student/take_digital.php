@@ -1,16 +1,22 @@
 <?php
 /** @var array $paper */
 /** @var array $questions */
-/** @var array $submission */
+/** @var array $submission Ignored in preview mode - pass ['id' => 0] */
 /** @var array $answers keyed by question_id */
+/** @var bool $previewMode Optional - true when a teacher/admin is previewing, not a real student attempt */
+$previewMode = $previewMode ?? false;
 $__title = htmlspecialchars($paper['title']);
 require __DIR__ . '/../partials/header.php';
 ?>
 <div class="panel test-panel" data-submission-id="<?= (int) $submission['id'] ?>" data-csrf="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
     <h1><?= htmlspecialchars($paper['title']) ?></h1>
-    <p class="autosave-status" id="autosave-status">Answers autosave as you type.</p>
+    <?php if ($previewMode): ?>
+        <p class="autosave-status"><strong>Preview mode</strong> &mdash; this is exactly what a student sees. Nothing entered here is saved, and this isn't a real attempt.</p>
+    <?php else: ?>
+        <p class="autosave-status" id="autosave-status">Answers autosave as you type.</p>
+    <?php endif; ?>
 
-    <form method="post" action="/assessment/student/submissions/<?= (int) $submission['id'] ?>/submit">
+    <form method="post" action="<?= $previewMode ? '#' : '/assessment/student/submissions/' . (int) $submission['id'] . '/submit' ?>" <?= $previewMode ? 'onsubmit="return false;"' : '' ?>>
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
 
         <?php foreach ($questions as $q): $existing = $answers[(int) $q['id']]['answer_text'] ?? ''; ?>
@@ -31,8 +37,10 @@ require __DIR__ . '/../partials/header.php';
             </fieldset>
         <?php endforeach; ?>
 
-        <button type="submit" class="btn btn-primary">Submit test</button>
+        <button type="submit" class="btn btn-primary" <?= $previewMode ? 'disabled title="Preview only - nothing to submit"' : '' ?>>Submit test</button>
     </form>
 </div>
+<?php if (!$previewMode): ?>
 <script src="/assessment/assets/js/autosave.js"></script>
+<?php endif; ?>
 <?php require __DIR__ . '/../partials/footer.php'; ?>

@@ -19,7 +19,7 @@ final class PaperController
      * subject (see Admin > Users) matches the paper's subject - department-
      * wide oversight per SRS 3.2, not limited to their own papers.
      */
-    private static function canManagePaper(array $user, array $paper): bool
+    public static function canManagePaper(array $user, array $paper): bool
     {
         if ((int) $paper['created_by'] === (int) $user['id']) {
             return true;
@@ -33,7 +33,7 @@ final class PaperController
         return false;
     }
 
-    private static function requireManageable(int $paperId, array $user): array
+    public static function requireManageable(int $paperId, array $user): array
     {
         $paper = Paper::find($paperId);
         if (!$paper || !self::canManagePaper($user, $paper)) {

@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/AuthController.php';
+require_once __DIR__ . '/PaperController.php';
 require_once __DIR__ . '/../models/Paper.php';
 require_once __DIR__ . '/../models/Question.php';
 require_once __DIR__ . '/../models/ClassRoster.php';
@@ -13,6 +14,31 @@ require_once __DIR__ . '/../services/OneDriveService.php';
 
 final class TestController
 {
+    /**
+     * "What does the student see?" - renders the exact same take_digital/
+     * take_pdf views a student would get, in a read-only preview mode: no
+     * Submission row is created, autosave/submit/scan are all disabled.
+     * Keyed by paper (not a specific assignment/class), since assignment
+     * only adds a due date / Teams link - the content shown is the same
+     * regardless of which class it's assigned to.
+     */
+    public static function preview(int $paperId): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        $paper = PaperController::requireManageable($paperId, $user);
+
+        $questions = Question::forPaper($paperId);
+        $answers = [];
+        $submission = ['id' => 0];
+        $previewMode = true;
+
+        if ($paper['type'] === 'digital') {
+            require __DIR__ . '/../views/student/take_digital.php';
+        } else {
+            require __DIR__ . '/../views/student/take_pdf.php';
+        }
+    }
+
     // --- Teacher: assign a paper to a class, optionally pushing to Teams ---
 
     public static function assignForm(int $paperId): void
