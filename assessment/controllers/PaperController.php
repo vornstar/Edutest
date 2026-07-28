@@ -85,11 +85,12 @@ final class PaperController
 
     public static function createForm(): void
     {
-        AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         require_once __DIR__ . '/../models/Subject.php';
         require_once __DIR__ . '/../models/PaperGroup.php';
         $subjects = Subject::all();
         $groups = PaperGroup::all();
+        $inboxFiles = (new OneDriveService((int) $user['id']))->listInbox();
         require __DIR__ . '/../views/teacher/paper_create.php';
     }
 
@@ -110,7 +111,9 @@ final class PaperController
             'duration_minutes' => !empty($_POST['duration_minutes']) ? (int) $_POST['duration_minutes'] : null,
         ]);
 
-        if ($type === 'pdf' && !empty($_FILES['paper_pdf']['tmp_name'])) {
+        $pdfProvided = !empty($_FILES['paper_pdf']['tmp_name']) || !empty($_POST['paper_pdf_inbox_id']);
+        $markSchemeProvided = !empty($_FILES['mark_scheme_pdf']['tmp_name']) || !empty($_POST['mark_scheme_pdf_inbox_id']);
+        if ($type === 'pdf' && ($pdfProvided || $markSchemeProvided)) {
             self::attachPdfUploads($paperId, (int) $user['id']);
         }
 
@@ -159,21 +162,36 @@ final class PaperController
     {
         $drive = new OneDriveService($actingUserId);
 
-        $pdfItemId = null;
-        if (!empty($_FILES['paper_pdf']['tmp_name']) && is_uploaded_file($_FILES['paper_pdf']['tmp_name'])) {
-            self::assertPdf($_FILES['paper_pdf']);
-            $content = file_get_contents($_FILES['paper_pdf']['tmp_name']);
-            $pdfItemId = $drive->uploadPaperPdf($paperId, 'paper.pdf', $content);
-        }
-
-        $markSchemeItemId = null;
-        if (!empty($_FILES['mark_scheme_pdf']['tmp_name']) && is_uploaded_file($_FILES['mark_scheme_pdf']['tmp_name'])) {
-            self::assertPdf($_FILES['mark_scheme_pdf']);
-            $content = file_get_contents($_FILES['mark_scheme_pdf']['tmp_name']);
-            $markSchemeItemId = $drive->uploadPaperPdf($paperId, 'mark_scheme.pdf', $content);
-        }
+        $pdfItemId = self::resolvePdfSlot($drive, $paperId, 'paper_pdf', 'paper.pdf');
+        $markSchemeItemId = self::resolvePdfSlot($drive, $paperId, 'mark_scheme_pdf', 'mark_scheme.pdf');
 
         Paper::attachPdf($paperId, (string) $pdfItemId, $markSchemeItemId);
+    }
+
+    /**
+     * Fills one PDF slot (exam paper / mark scheme) either from a direct
+     * file upload or, if the teacher instead picked one, from a file
+     * already sitting in the Bulk upload Inbox (see PaperController::
+     * inboxForm/OneDriveService::attachInboxItem) - the same "attach"
+     * operation the standalone Inbox page uses, just reachable from the
+     * paper-creation form's own file picker instead of a separate trip.
+     * An Inbox pick (POST {$fieldName}_inbox_id) always wins over a
+     * simultaneously-submitted file upload for the same slot.
+     */
+    private static function resolvePdfSlot(OneDriveService $drive, int $paperId, string $fieldName, string $filename): ?string
+    {
+        $inboxItemId = trim((string) ($_POST[$fieldName . '_inbox_id'] ?? ''));
+        if ($inboxItemId !== '') {
+            return $drive->attachInboxItem($inboxItemId, $paperId, $filename);
+        }
+
+        if (!empty($_FILES[$fieldName]['tmp_name']) && is_uploaded_file($_FILES[$fieldName]['tmp_name'])) {
+            self::assertPdf($_FILES[$fieldName]);
+            $content = file_get_contents($_FILES[$fieldName]['tmp_name']);
+            return $drive->uploadPaperPdf($paperId, $filename, $content);
+        }
+
+        return null;
     }
 
     private static function assertPdf(array $file): void

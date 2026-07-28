@@ -1,6 +1,7 @@
 <?php
 /** @var array $subjects */
 /** @var array $groups */
+/** @var array $inboxFiles files already sitting in the Bulk upload Inbox: id, name, size, lastModifiedDateTime */
 $__title = 'New paper';
 require __DIR__ . '/../partials/header.php';
 ?>
@@ -42,7 +43,29 @@ require __DIR__ . '/../partials/header.php';
 
         <div id="pdf-fields" hidden>
             <label>Exam paper PDF <input type="file" name="paper_pdf" accept="application/pdf"></label>
+            <?php if ($inboxFiles): ?>
+                <label>Or choose an already-uploaded file
+                    <select name="paper_pdf_inbox_id">
+                        <option value="">&mdash; use the file picker above &mdash;</option>
+                        <?php foreach ($inboxFiles as $f): ?>
+                            <option value="<?= htmlspecialchars($f['id']) ?>"><?= htmlspecialchars($f['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+            <?php endif; ?>
+
             <label>Mark scheme PDF <input type="file" name="mark_scheme_pdf" accept="application/pdf"></label>
+            <?php if ($inboxFiles): ?>
+                <label>Or choose an already-uploaded file
+                    <select name="mark_scheme_pdf_inbox_id">
+                        <option value="">&mdash; use the file picker above &mdash;</option>
+                        <?php foreach ($inboxFiles as $f): ?>
+                            <option value="<?= htmlspecialchars($f['id']) ?>"><?= htmlspecialchars($f['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <p class="autosave-status">Picking a file from the dropdown moves it out of <a href="/assessment/teacher/papers/inbox" target="_blank">Bulk upload</a> onto this paper - it wins over anything chosen in the file picker above for the same slot.</p>
+            <?php endif; ?>
             <label>Max marks <input type="number" step="0.5" min="0" name="max_marks"></label>
             <p class="autosave-status">PDF papers don't need a question-by-question breakdown - students type/write directly on the PDF, and you enter one overall score out of this when marking.</p>
         </div>
