@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/Crypto.php';
+require_once __DIR__ . '/User.php';
 
 final class Submission
 {
@@ -148,7 +149,7 @@ final class Submission
         return $id !== false ? (int) $id : null;
     }
 
-    /** student_name is encrypted (users.display_name_cipher) so it can't be sorted in SQL - decrypted then re-sorted alphabetically here instead. */
+    /** student_name is encrypted (users.display_name_cipher) so it can't be sorted in SQL - decrypted then re-sorted by surname here instead. */
     public static function forAssignment(int $assignmentId): array
     {
         $stmt = Database::connection()->prepare(
@@ -162,7 +163,10 @@ final class Submission
             unset($row['student_name_cipher']);
             return $row;
         }, $stmt->fetchAll());
-        usort($rows, static fn($a, $b) => strcasecmp($a['student_name'], $b['student_name']));
+        usort($rows, static function (array $a, array $b): int {
+            $bySurname = strcasecmp(User::surnameSortKey($a['student_name']), User::surnameSortKey($b['student_name']));
+            return $bySurname !== 0 ? $bySurname : strcasecmp($a['student_name'], $b['student_name']);
+        });
         return $rows;
     }
 

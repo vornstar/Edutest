@@ -63,8 +63,15 @@
                     studentCanvas.requestRenderAll();
                     var studentJson = window.__myAnnotations && window.__myAnnotations[pageNumber];
                     if (studentJson) {
-                        studentCanvas.loadFromJSON(PdfAnnotateCore.stripBackground(studentJson), function () {
-                            studentCanvas.requestRenderAll();
+                        // loadFromJSON() resets backgroundImage to whatever
+                        // the JSON says, including null/absent (which it will
+                        // be, once stripBackground() has been applied at save
+                        // time), unconditionally clearing the real one just
+                        // set above - re-apply the same img afterward.
+                        studentCanvas.loadFromJSON(studentJson, function () {
+                            studentCanvas.setBackgroundImage(img, function () {
+                                studentCanvas.requestRenderAll();
+                            });
                         });
                     }
                 });

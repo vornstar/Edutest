@@ -176,7 +176,7 @@
             fabric.Image.fromURL(rendered.dataUrl, function (img) {
                 fabricCanvas.setBackgroundImage(img, function () {
                     fabricCanvas.requestRenderAll();
-                    loadExisting(pageNumber);
+                    loadExisting(pageNumber, img);
                 });
             });
         });
@@ -291,11 +291,21 @@
         });
     }
 
-    function loadExisting(pageNumber) {
+    /**
+     * @param {fabric.Image} img the already-loaded page image, so it can be
+     * re-applied as the background after loadFromJSON() - which resets
+     * backgroundImage to whatever's in the JSON (nothing, once
+     * stripBackground() has been applied at save time - see saveNow()),
+     * unconditionally clearing the real one that's already showing,
+     * regardless of whether the loaded JSON itself carries one.
+     */
+    function loadExisting(pageNumber, img) {
         var existing = window.__existingStudentAnnotations && window.__existingStudentAnnotations[pageNumber];
         if (existing) {
-            fabricCanvas.loadFromJSON(PdfAnnotateCore.stripBackground(existing), function () {
-                fabricCanvas.requestRenderAll();
+            fabricCanvas.loadFromJSON(existing, function () {
+                fabricCanvas.setBackgroundImage(img, function () {
+                    fabricCanvas.requestRenderAll();
+                });
             });
         }
     }

@@ -80,9 +80,30 @@ final class User
     }
 
     /**
+     * display_name comes from Entra ID as one combined "Given Surname"
+     * string - there's no separate surname field synced - so the surname
+     * is taken as its last whitespace-separated word. Not perfect for a
+     * multi-word surname ("Van Der Berg"), but there's no reliable way to
+     * do better without that data, and it's the right answer for the
+     * common case a UK school roster needs: alphabetical by surname.
+     */
+    public static function surnameSortKey(string $displayName): string
+    {
+        $parts = preg_split('/\s+/', trim($displayName));
+        return $parts && end($parts) !== '' ? end($parts) : $displayName;
+    }
+
+    /** Surname first, then full name as a tiebreaker so e.g. two "Smith"s stay in a stable, sensible order relative to each other. */
+    public static function compareBySurname(array $a, array $b): int
+    {
+        $bySurname = strcasecmp(self::surnameSortKey($a['display_name']), self::surnameSortKey($b['display_name']));
+        return $bySurname !== 0 ? $bySurname : strcasecmp($a['display_name'], $b['display_name']);
+    }
+
+    /**
      * display_name is encrypted, so it can't be sorted in SQL - fetches
      * are bounded by $limit/$offset at the row level as before, then
-     * decrypted and re-sorted alphabetically in PHP. Fine at school scale
+     * decrypted and re-sorted by surname in PHP. Fine at school scale
      * (hundreds, not millions, of users).
      */
     public static function all(int $limit = 500, int $offset = 0): array
@@ -92,7 +113,7 @@ final class User
         $stmt->bindValue('offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
         $users = array_map([self::class, 'hydrate'], $stmt->fetchAll());
-        usort($users, static fn($a, $b) => strcasecmp($a['display_name'], $b['display_name']));
+        usort($users, [self::class, 'compareBySurname']);
         return $users;
     }
 

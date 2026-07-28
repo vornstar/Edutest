@@ -75,7 +75,7 @@ final class ClassRoster
         $stmt->execute(['class_id' => $classId, 'user_id' => $userId]);
     }
 
-    /** display_name is encrypted (see User::hydrate) so it can't be sorted in SQL - decrypted then re-sorted alphabetically here instead. */
+    /** display_name is encrypted (see User::hydrate) so it can't be sorted in SQL - decrypted then re-sorted by surname here instead. */
     public static function students(int $classId): array
     {
         $stmt = Database::connection()->prepare(
@@ -85,7 +85,7 @@ final class ClassRoster
         );
         $stmt->execute(['class_id' => $classId]);
         $students = array_map([User::class, 'hydrate'], $stmt->fetchAll());
-        usort($students, static fn($a, $b) => strcasecmp($a['display_name'], $b['display_name']));
+        usort($students, [User::class, 'compareBySurname']);
         return $students;
     }
 

@@ -203,7 +203,7 @@
             fabric.Image.fromURL(rendered.dataUrl, function (img) {
                 fabricCanvas.setBackgroundImage(img, function () {
                     fabricCanvas.requestRenderAll();
-                    loadOwnAnnotation(pageNumber);
+                    loadOwnAnnotation(pageNumber, img);
                     renderStudentLayer(pageNumber, rendered.width, rendered.height);
                 });
             });
@@ -307,11 +307,22 @@
         return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
     }
 
-    function loadOwnAnnotation(pageNumber) {
+    /**
+     * @param {fabric.Image} img the already-loaded page image, so it can be
+     * re-applied as the background after loadFromJSON() - which resets
+     * backgroundImage to whatever's in the JSON (nothing, once
+     * stripBackground() has been applied at save time - see
+     * saveAnnotation()), unconditionally clearing the real one that's
+     * already showing, regardless of whether the loaded JSON itself
+     * carries one.
+     */
+    function loadOwnAnnotation(pageNumber, img) {
         var existing = window.__existingAnnotations && window.__existingAnnotations[pageNumber];
         if (existing) {
-            fabricCanvas.loadFromJSON(PdfAnnotateCore.stripBackground(existing), function () {
-                fabricCanvas.requestRenderAll();
+            fabricCanvas.loadFromJSON(existing, function () {
+                fabricCanvas.setBackgroundImage(img, function () {
+                    fabricCanvas.requestRenderAll();
+                });
             });
         }
     }
