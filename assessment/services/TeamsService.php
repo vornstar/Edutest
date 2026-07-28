@@ -113,6 +113,12 @@ final class TeamsService
         return $teamsAssignmentId;
     }
 
+    /** Removes a pushed assignment from Teams entirely - used when a teacher cancels a test (see TestController::cancelTest). Graph, not this app, owns any of that assignment's submission data on the Teams side, so this doesn't touch anything local. */
+    public function deleteAssignment(string $teamsClassId, string $teamsAssignmentId): void
+    {
+        $this->graph->delete("/education/classes/{$teamsClassId}/assignments/{$teamsAssignmentId}");
+    }
+
     /** Optional status sync back to the Teams gradebook (Assigned / Submitted / Graded). */
     public function syncStatus(string $teamsClassId, string $teamsAssignmentId, string $status): void
     {

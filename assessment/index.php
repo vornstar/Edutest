@@ -99,6 +99,8 @@ $routes = [
     ['GET', '/teacher/open-tests', [TestController::class, 'openTests']],
     ['POST', '/teacher/assignments/{id}/close', [TestController::class, 'closeTest']],
     ['POST', '/teacher/assignments/{id}/reopen', [TestController::class, 'reopenTest']],
+    ['POST', '/teacher/assignments/{id}/cancel', [TestController::class, 'cancelTest']],
+    ['POST', '/teacher/assignments/{id}/restore', [TestController::class, 'restoreTest']],
     ['GET', '/teacher/papers/{id}/results', [PaperController::class, 'results']],
 
     ['GET', '/teacher/assignments/{id}/upload-scan', [ScanUploadController::class, 'form']],

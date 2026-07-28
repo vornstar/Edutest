@@ -112,9 +112,22 @@ final class TestController
         exit;
     }
 
-    /** Blocks any further student-facing write once a teacher has closed the test window early (see TestAssignment::close) - self-tests are never closed, so this is a no-op for them. */
+    /**
+     * Blocks any further student-facing write once a teacher has closed
+     * the test window early (see TestAssignment::close) or cancelled it
+     * outright (see TestAssignment::cancel) - self-tests are never
+     * closed/cancelled, so this is a no-op for them. A cancelled
+     * assignment is also fully hidden from take()'s initial GET (404, not
+     * this 403) - this catches the case where a student already has a
+     * submission open in another tab when it gets cancelled.
+     */
     private static function requireOpenAssignment(?array $assignment): void
     {
+        if ($assignment && !empty($assignment['cancelled_at'])) {
+            http_response_code(403);
+            echo 'This test has been cancelled by your teacher.';
+            exit;
+        }
         if ($assignment && !empty($assignment['closed_at'])) {
             http_response_code(403);
             echo 'This test window has been closed by your teacher.';
@@ -176,6 +189,7 @@ final class TestController
     {
         $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         $assignments = TestAssignment::forAssignedBy((int) $user['id']);
+        $cancelledAssignments = TestAssignment::cancelledForAssignedBy((int) $user['id']);
 
         $progress = [];
         foreach ($assignments as $a) {
@@ -232,6 +246,59 @@ final class TestController
     }
 
     /**
+     * Cancels ("deletes") a test: hides it from the student entirely and,
+     * if it was pushed to Teams, removes it there too - but nothing in the
+     * database is actually deleted (see TestAssignment::cancel). The Teams
+     * removal is best-effort: if Graph fails (token expired, already
+     * removed there, etc.) the local cancel still goes ahead regardless,
+     * same as every other Teams sync in this app.
+     */
+    public static function cancelTest(int $assignmentId): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        AuthController::verifyCsrf();
+        $assignment = TestAssignment::find($assignmentId);
+        if (!$assignment) {
+            http_response_code(404);
+            exit;
+        }
+        PaperController::requireManageable((int) $assignment['paper_id'], $user);
+
+        if (!empty($assignment['teams_assignment_id']) && !empty($assignment['class_id'])) {
+            $class = ClassRoster::find((int) $assignment['class_id']);
+            if ($class && !empty($class['teams_class_id'])) {
+                try {
+                    $teams = new TeamsService((int) $user['id']);
+                    $teams->deleteAssignment((string) $class['teams_class_id'], (string) $assignment['teams_assignment_id']);
+                } catch (Throwable $e) {
+                    error_log('Teams assignment delete failed for assignment ' . $assignmentId . ': ' . $e->getMessage());
+                }
+            }
+        }
+
+        TestAssignment::cancel($assignmentId);
+        header('Location: /assessment/teacher/open-tests');
+        exit;
+    }
+
+    /** Undoes cancelTest() - the assignment reappears for the student exactly as it was. Does not recreate a removed Teams assignment (see TestAssignment::restore). */
+    public static function restoreTest(int $assignmentId): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        AuthController::verifyCsrf();
+        $assignment = TestAssignment::find($assignmentId);
+        if (!$assignment) {
+            http_response_code(404);
+            exit;
+        }
+        PaperController::requireManageable((int) $assignment['paper_id'], $user);
+
+        TestAssignment::restore($assignmentId);
+        header('Location: /assessment/teacher/open-tests');
+        exit;
+    }
+
+    /**
      * Flips self-marking on/off for an already-assigned test - lets a
      * teacher hold it off while the class is still sitting the test, then
      * enable it once everyone's finished (or due date has passed) so early
@@ -267,7 +334,7 @@ final class TestController
     {
         $user = AuthController::requireRole([User::ROLE_STUDENT]);
         $assignment = TestAssignment::find($assignmentId);
-        if (!$assignment || !ClassRoster::isMember((int) $assignment['class_id'], (int) $user['id'])) {
+        if (!$assignment || !ClassRoster::isMember((int) $assignment['class_id'], (int) $user['id']) || !empty($assignment['cancelled_at'])) {
             http_response_code(404);
             exit;
         }

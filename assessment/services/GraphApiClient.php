@@ -76,6 +76,11 @@ final class GraphApiClient
         return $this->request('PATCH', $path, [], $body);
     }
 
+    public function delete(string $path): array
+    {
+        return $this->request('DELETE', $path);
+    }
+
     /** Uploads raw binary content (e.g. a PDF) to a OneDrive path via PUT. */
     public function putBinary(string $path, string $binaryContent, string $contentType = 'application/octet-stream'): array
     {

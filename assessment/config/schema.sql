@@ -134,6 +134,7 @@ CREATE TABLE IF NOT EXISTS test_assignments (
     sync_to_teams       TINYINT(1) NOT NULL DEFAULT 0,
     self_marking_enabled TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'Set at assign-time or toggled afterward (see TestAssignment::setSelfMarking) - per-assignment, not per-paper, so a teacher can withhold it until everyone has finished',
     closed_at           DATETIME NULL COMMENT 'NULL = open (accepting student work). Set/cleared via TestAssignment::close()/reopen() - lets a teacher end a test window early or reopen it, independent of due_at.',
+    cancelled_at        DATETIME NULL COMMENT 'NULL = active. Set/cleared via TestAssignment::cancel()/restore() - a soft delete: hides the assignment from the student entirely and removes it from Teams if it was pushed there, but nothing (submissions, marks, annotations) is ever actually deleted.',
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_assign_paper FOREIGN KEY (paper_id) REFERENCES papers(id) ON DELETE CASCADE,
     CONSTRAINT fk_assign_class FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE SET NULL,

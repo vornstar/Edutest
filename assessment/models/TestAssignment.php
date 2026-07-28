@@ -66,15 +66,29 @@ final class TestAssignment
         return $stmt->fetchAll();
     }
 
-    /** Every real (non-self-test) assignment this teacher-portal user has assigned - used by the "Open tests" page. */
+    /** Every real (non-self-test), non-cancelled assignment this teacher-portal user has assigned - used by the "Open tests" page. */
     public static function forAssignedBy(int $userId): array
     {
         $stmt = Database::connection()->prepare(
             'SELECT a.*, p.title AS paper_title, c.name AS class_name FROM test_assignments a
              INNER JOIN papers p ON p.id = a.paper_id
              INNER JOIN classes c ON c.id = a.class_id
-             WHERE a.assigned_by = :assigned_by AND a.class_id IS NOT NULL
+             WHERE a.assigned_by = :assigned_by AND a.class_id IS NOT NULL AND a.cancelled_at IS NULL
              ORDER BY a.closed_at IS NOT NULL, a.due_at IS NULL, a.due_at ASC'
+        );
+        $stmt->execute(['assigned_by' => $userId]);
+        return $stmt->fetchAll();
+    }
+
+    /** The "Deleted tests" counterpart to forAssignedBy() - every cancelled assignment this teacher-portal user assigned, most recently cancelled first. */
+    public static function cancelledForAssignedBy(int $userId): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT a.*, p.title AS paper_title, c.name AS class_name FROM test_assignments a
+             INNER JOIN papers p ON p.id = a.paper_id
+             INNER JOIN classes c ON c.id = a.class_id
+             WHERE a.assigned_by = :assigned_by AND a.class_id IS NOT NULL AND a.cancelled_at IS NOT NULL
+             ORDER BY a.cancelled_at DESC'
         );
         $stmt->execute(['assigned_by' => $userId]);
         return $stmt->fetchAll();
@@ -93,13 +107,34 @@ final class TestAssignment
         $stmt->execute(['id' => $id]);
     }
 
+    /**
+     * Soft-deletes an assignment: hides it from the student entirely (see
+     * TestController::take()/requireOpenAssignment()) - nothing under it
+     * (submissions, marks, annotations) is touched. Any Teams cleanup is
+     * the caller's responsibility (see TestController::cancelTest()),
+     * since that needs the acting user's Graph credentials, which this
+     * model layer doesn't have.
+     */
+    public static function cancel(int $id): void
+    {
+        $stmt = Database::connection()->prepare('UPDATE test_assignments SET cancelled_at = NOW() WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+    }
+
+    /** Undoes cancel() - the assignment reappears for the student exactly as it was. Does NOT recreate a deleted Teams assignment; if one was removed, it stays removed and must be re-assigned/re-synced separately. */
+    public static function restore(int $id): void
+    {
+        $stmt = Database::connection()->prepare('UPDATE test_assignments SET cancelled_at = NULL WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+    }
+
     public static function forStudent(int $studentId): array
     {
         $stmt = Database::connection()->prepare(
             'SELECT a.*, p.title, p.type FROM test_assignments a
              INNER JOIN papers p ON p.id = a.paper_id
              INNER JOIN class_enrollments ce ON ce.class_id = a.class_id
-             WHERE ce.user_id = :student_id AND ce.role_in_class = "student"
+             WHERE ce.user_id = :student_id AND ce.role_in_class = "student" AND a.cancelled_at IS NULL
              ORDER BY a.due_at IS NULL, a.due_at ASC'
         );
         $stmt->execute(['student_id' => $studentId]);
