@@ -140,6 +140,36 @@
         }
     });
 
+    /**
+     * Arrow-key navigation while marking/moderating: Up/Down scroll the
+     * browser window (there's often more script above/below the toolbar
+     * than fits on screen at once), Left/Right move to the previous/next
+     * PDF page - same as clicking the Prev/Next buttons. Fixed, not
+     * user-configurable like the shortcuts above (arrow keys aren't offered
+     * there anyway). Skipped while typing, editing a text object, or when a
+     * <select> has focus (its own Up/Down already changes the selection -
+     * e.g. the "Student's attempt" version picker).
+     */
+    document.addEventListener('keydown', function (e) {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        var activeEl = document.activeElement;
+        var tag = activeEl ? activeEl.tagName.toLowerCase() : '';
+        if (tag === 'input' || tag === 'textarea' || tag === 'select' || (activeEl && activeEl.isContentEditable)) return;
+        var activeObj = fabricCanvas ? fabricCanvas.getActiveObject() : null;
+        if (activeObj && activeObj.isEditing) return;
+
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            window.scrollBy({ top: e.key === 'ArrowUp' ? -120 : 120, behavior: 'smooth' });
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            var pageBtn = document.querySelector(e.key === 'ArrowLeft' ? '[data-page-prev]' : '[data-page-next]');
+            if (pageBtn && !pageBtn.disabled) {
+                e.preventDefault();
+                pageBtn.click();
+            }
+        }
+    });
+
     PdfAnnotateCore.loadDocument(canvasEl.dataset.pdfSrc).then(function (pdfDoc) {
         pagination = PdfAnnotateCore.wirePagination(
             document.querySelector('.annotation-tools'),
