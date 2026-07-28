@@ -32,6 +32,10 @@
     var studentStaticCanvas = null;
     var lastRendered = null;
     var placeholderText = null;
+    // The ellipse currently being dragged out by the Circle tool, and where the
+    // drag started - both null except mid-drag, reset per page like placeholderText.
+    var drawingCircle = null;
+    var circleStartPointer = null;
     // Persists across page turns, unlike fabricCanvas itself, which is
     // disposed and rebuilt fresh for every page - so the marker doesn't
     // have to reselect "Pen" every time they turn a page.
@@ -165,6 +169,8 @@
         if (studentStaticCanvas) studentStaticCanvas.dispose();
         currentPage = pageNumber;
         placeholderText = null;
+        drawingCircle = null;
+        circleStartPointer = null;
         try { window.localStorage.setItem(pageStorageKey, String(pageNumber)); } catch (e) { /* storage unavailable - not fatal, just won't resume on refresh */ }
 
         PdfAnnotateCore.renderPageToImage(pdfDoc, pageNumber, RENDER_SCALE).then(function (rendered) {
@@ -211,7 +217,48 @@
                     });
                     fabricCanvas.add(stamp);
                     fabricCanvas.setActiveObject(stamp);
+                } else if (currentTool === 'circle') {
+                    // Drag to size it around whatever's being circled; a plain
+                    // click with no real drag (see mouse:up) places a sensible
+                    // default size instead, so it still works as a one-click stamp.
+                    var circlePointer = fabricCanvas.getPointer(opt.e);
+                    circleStartPointer = circlePointer;
+                    drawingCircle = new fabric.Ellipse({
+                        left: circlePointer.x, top: circlePointer.y,
+                        rx: 0, ry: 0,
+                        originX: 'center', originY: 'center',
+                        fill: 'transparent',
+                        stroke: currentColor(),
+                        strokeWidth: 3,
+                        selectable: false,
+                        evented: false,
+                    });
+                    fabricCanvas.add(drawingCircle);
                 }
+            });
+            fabricCanvas.on('mouse:move', function (opt) {
+                if (!drawingCircle || !circleStartPointer) return;
+                var pointer = fabricCanvas.getPointer(opt.e);
+                drawingCircle.set({
+                    left: (pointer.x + circleStartPointer.x) / 2,
+                    top: (pointer.y + circleStartPointer.y) / 2,
+                    rx: Math.abs(pointer.x - circleStartPointer.x) / 2,
+                    ry: Math.abs(pointer.y - circleStartPointer.y) / 2,
+                });
+                drawingCircle.setCoords();
+                fabricCanvas.requestRenderAll();
+            });
+            fabricCanvas.on('mouse:up', function () {
+                if (!drawingCircle) return;
+                if (drawingCircle.rx < 8 && drawingCircle.ry < 8) {
+                    drawingCircle.set({ rx: 30, ry: 20 });
+                    drawingCircle.setCoords();
+                }
+                drawingCircle.set({ selectable: true, evented: true });
+                fabricCanvas.setActiveObject(drawingCircle);
+                fabricCanvas.requestRenderAll();
+                drawingCircle = null;
+                circleStartPointer = null;
             });
             fabricCanvas.on('text:editing:exited', function (opt) {
                 // Clicking away without typing anything leaves an empty/
@@ -276,7 +323,7 @@
         currentTool = tool;
         if (tool === 'stamp') currentStampLabel = stampLabel;
         if (!fabricCanvas) return;
-        canvasEl.style.cursor = (tool === 'text' || tool === 'stamp') ? 'crosshair' : '';
+        canvasEl.style.cursor = (tool === 'text' || tool === 'stamp' || tool === 'circle') ? 'crosshair' : '';
         if (tool === 'pen') {
             fabricCanvas.isDrawingMode = true;
             fabricCanvas.freeDrawingBrush.width = 3;
@@ -286,7 +333,7 @@
             fabricCanvas.freeDrawingBrush.width = 16;
             fabricCanvas.freeDrawingBrush.color = hexToRgba(currentColor(), 0.35);
         } else {
-            fabricCanvas.isDrawingMode = false; // 'text' and 'stamp'
+            fabricCanvas.isDrawingMode = false; // 'text', 'stamp', and 'circle' (its own drag-to-size handled via mouse:down/move/up, not the free-drawing brush)
         }
         toolButtons.forEach(function (btn) {
             var isThisStamp = tool === 'stamp' && btn.dataset.tool === 'stamp' && btn.dataset.stamp === stampLabel;
@@ -302,7 +349,7 @@
                 btn.onclick = function () { applyTool('stamp', btn.dataset.stamp); };
                 return;
             }
-            if (tool !== 'pen' && tool !== 'highlighter' && tool !== 'text' && tool !== 'delete') return;
+            if (tool !== 'pen' && tool !== 'highlighter' && tool !== 'text' && tool !== 'circle' && tool !== 'delete') return;
             btn.onclick = function () {
                 if (tool === 'delete') {
                     deleteSelected();

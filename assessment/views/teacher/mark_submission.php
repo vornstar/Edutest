@@ -63,6 +63,7 @@ $hasTypedAnswers = $paper['type'] === 'digital' && empty($submission['scan_drive
                     <button type="button" data-tool="pen">Pen</button>
                     <button type="button" data-tool="highlighter">Highlighter</button>
                     <button type="button" data-tool="text">Text</button>
+                    <button type="button" data-tool="circle" title="Drag to circle a mark - or just click for a default-sized circle">Circle</button>
                     <button type="button" data-tool="delete">Delete selected</button>
                     <input type="color" data-tool="color" value="<?= htmlspecialchars($__branding['teacher_marking_color'] ?? Branding::DEFAULT_TEACHER_MARKING_COLOR) ?>">
                     <?php require __DIR__ . '/../partials/stamp_toolbar.php'; ?>
