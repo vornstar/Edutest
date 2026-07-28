@@ -2,6 +2,7 @@
 /** @var array $papers */
 /** @var array $user */
 /** @var array $groups */
+/** @var array $questionTotals digital papers' total marks (SUM of question max_marks), keyed by paper id */
 $__title = 'Papers';
 require __DIR__ . '/../partials/header.php';
 
@@ -25,18 +26,36 @@ usort($orderedGroupIds, static function (int $a, int $b) use ($groupNames): int 
     return strcasecmp($groupNames[$a] ?? '', $groupNames[$b] ?? '');
 });
 
-$renderPapersTable = static function (array $papers) use ($user): void {
+/** Trims a trailing ".00"/".50" etc. down to whichever is cleanest, e.g. 20.0 -> "20", 12.5 -> "12.5". */
+$formatMarks = static function (float $v): string {
+    return rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.');
+};
+
+$renderPapersTable = static function (array $papers) use ($user, $questionTotals, $formatMarks): void {
     ?>
     <table class="data-table">
-        <thead><tr><th>Title</th><th>Subject</th><th>Type</th><th>Status</th><th>Owner</th><th></th></tr></thead>
+        <thead><tr><th>Title</th><th>Subject</th><th>Type</th><th>Status</th><th>Marks</th><th>Minutes</th><th>Files</th><th>Owner</th><th></th></tr></thead>
         <tbody>
         <?php foreach ($papers as $p): ?>
-            <?php $canManage = PaperController::canManagePaper($user, $p); ?>
+            <?php
+            $canManage = PaperController::canManagePaper($user, $p);
+            if ($p['type'] === 'pdf') {
+                $marks = $p['max_marks'] !== null ? $formatMarks((float) $p['max_marks']) : '—';
+                $fileCount = (!empty($p['pdf_drive_item_id']) ? 1 : 0) + (!empty($p['mark_scheme_drive_item_id']) ? 1 : 0);
+                $files = $fileCount . '/2';
+            } else {
+                $marks = isset($questionTotals[(int) $p['id']]) ? $formatMarks($questionTotals[(int) $p['id']]) : '0';
+                $files = '—';
+            }
+            ?>
             <tr>
                 <td><?= htmlspecialchars($p['title']) ?></td>
                 <td><?= htmlspecialchars($p['subject'] ?? '—') ?></td>
                 <td><?= htmlspecialchars($p['type']) ?></td>
                 <td><?= htmlspecialchars($p['status']) ?></td>
+                <td><?= htmlspecialchars($marks) ?></td>
+                <td><?= htmlspecialchars((string) ($p['duration_minutes'] ?? '—')) ?></td>
+                <td><?= htmlspecialchars($files) ?></td>
                 <td><?= (int) $p['created_by'] === (int) $user['id'] ? 'You' : 'Colleague' ?></td>
                 <td>
                     <a href="/assessment/teacher/papers/<?= (int) $p['id'] ?>"><?= $canManage ? 'Manage' : 'View' ?></a>

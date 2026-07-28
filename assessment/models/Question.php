@@ -40,6 +40,24 @@ final class Question
         return $stmt->fetchAll();
     }
 
+    /** Every digital paper's total available marks (SUM of its questions' max_marks), keyed by paper_id - one query for the whole papers list rather than one per paper. Papers with no questions yet, or pdf-type papers (which have no rows here at all), simply have no entry. */
+    public static function totalMarksByPaper(): array
+    {
+        $stmt = Database::connection()->query('SELECT paper_id, SUM(max_marks) AS total FROM questions GROUP BY paper_id');
+        $totals = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $totals[(int) $row['paper_id']] = (float) $row['total'];
+        }
+        return $totals;
+    }
+
+    /** Edits one existing question's max marks - the only per-question field editable after creation, so a digital paper's total (SUM of these, see totalMarksByPaper) can be corrected without recreating the question. */
+    public static function setMaxMarks(int $questionId, float $maxMarks): void
+    {
+        $stmt = Database::connection()->prepare('UPDATE questions SET max_marks = :max_marks WHERE id = :id');
+        $stmt->execute(['max_marks' => $maxMarks, 'id' => $questionId]);
+    }
+
     public static function find(int $id): ?array
     {
         $stmt = Database::connection()->prepare('SELECT * FROM questions WHERE id = :id');

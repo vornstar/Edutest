@@ -80,6 +80,7 @@ final class PaperController
         $papers = Paper::visibleTo($user);
         require_once __DIR__ . '/../models/PaperGroup.php';
         $groups = PaperGroup::all();
+        $questionTotals = Question::totalMarksByPaper();
         require __DIR__ . '/../views/teacher/papers_index.php';
     }
 
@@ -391,6 +392,25 @@ final class PaperController
         exit;
     }
 
+    /** Edits one existing digital-paper question's max marks - lets a teacher correct/rebalance the paper's total (see Question::totalMarksByPaper) without recreating the question. */
+    public static function updateQuestionMarks(int $paperId, int $questionId): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        AuthController::verifyCsrf();
+        self::requireManageable($paperId, $user);
+
+        $question = Question::find($questionId);
+        if (!$question || (int) $question['paper_id'] !== $paperId) {
+            http_response_code(404);
+            exit;
+        }
+
+        Question::setMaxMarks($questionId, (float) ($_POST['max_marks'] ?? 0));
+
+        header('Location: /assessment/teacher/papers/' . $paperId);
+        exit;
+    }
+
     /**
      * Bulk imports questions from a CSV with columns:
      * section,type,question_text,options,correct_option,max_marks,mark_scheme,model_answer
@@ -466,6 +486,20 @@ final class PaperController
 
         $maxMarks = !empty($_POST['max_marks']) ? (float) $_POST['max_marks'] : null;
         Paper::setMaxMarks($paperId, $maxMarks);
+
+        header('Location: /assessment/teacher/papers/' . $paperId);
+        exit;
+    }
+
+    /** Edits how long a paper is meant to take, in minutes - available for either paper type (unlike max marks, which is pdf-only - a digital paper's total is the sum of its questions' marks, not a single value to edit here). */
+    public static function updateDuration(int $paperId): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        AuthController::verifyCsrf();
+        self::requireManageable($paperId, $user);
+
+        $minutes = !empty($_POST['duration_minutes']) ? (int) $_POST['duration_minutes'] : null;
+        Paper::setDuration($paperId, $minutes);
 
         header('Location: /assessment/teacher/papers/' . $paperId);
         exit;

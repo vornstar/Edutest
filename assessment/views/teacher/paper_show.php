@@ -9,6 +9,11 @@
 /** @var array|null $paperGroup */
 $__title = htmlspecialchars($paper['title']);
 require __DIR__ . '/../partials/header.php';
+
+/** Trims a trailing ".00"/".50" etc. down to whichever is cleanest, e.g. 20.0 -> "20", 12.5 -> "12.5". */
+$formatMarks = static function (float $v): string {
+    return rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.');
+};
 ?>
 <div class="panel">
     <div class="panel-header">
@@ -70,6 +75,20 @@ require __DIR__ . '/../partials/header.php';
         </form>
     <?php elseif ($paper['type'] === 'pdf'): ?>
         <p>Max marks: <?= htmlspecialchars((string) ($paper['max_marks'] ?? '—')) ?></p>
+    <?php else: ?>
+        <p class="autosave-status">Marks: total of each question's max marks below - edit a question's marks there to change the total.</p>
+    <?php endif; ?>
+
+    <?php if ($canManage): ?>
+        <form method="post" action="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/duration" style="display:flex;gap:0.5rem;align-items:flex-end;">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
+            <label>Duration (minutes)
+                <input type="number" min="1" name="duration_minutes" value="<?= htmlspecialchars((string) ($paper['duration_minutes'] ?? '')) ?>">
+            </label>
+            <button type="submit" class="btn">Save</button>
+        </form>
+    <?php elseif ($paper['duration_minutes']): ?>
+        <p>Duration: <?= (int) $paper['duration_minutes'] ?> minutes</p>
     <?php endif; ?>
 
     <div class="question-block">
@@ -113,6 +132,7 @@ require __DIR__ . '/../partials/header.php';
 
     <?php if ($paper['type'] === 'digital' && $canManage): ?>
     <h2>Questions (answer booklet structure)</h2>
+    <p class="autosave-status">Total marks: <?= htmlspecialchars($formatMarks(array_sum(array_column($questions, 'max_marks')))) ?></p>
     <table class="data-table">
         <thead><tr><th>#</th><th>Section</th><th>Type</th><th>Text</th><th>Max marks</th></tr></thead>
         <tbody>
@@ -122,7 +142,13 @@ require __DIR__ . '/../partials/header.php';
                 <td><?= htmlspecialchars($q['section'] ?? '') ?></td>
                 <td><?= htmlspecialchars($q['type']) ?></td>
                 <td><?= htmlspecialchars(mb_strimwidth($q['question_text'], 0, 80, '…')) ?></td>
-                <td><?= htmlspecialchars((string) $q['max_marks']) ?></td>
+                <td>
+                    <form method="post" action="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/questions/<?= (int) $q['id'] ?>/marks" style="display:flex;gap:0.25rem;align-items:center;">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
+                        <input type="number" step="0.5" min="0" name="max_marks" value="<?= htmlspecialchars((string) $q['max_marks']) ?>" style="width:5em">
+                        <button type="submit" class="btn">Save</button>
+                    </form>
+                </td>
             </tr>
         <?php endforeach; ?>
         <?php if (!$questions): ?>

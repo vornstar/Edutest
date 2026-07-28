@@ -33,6 +33,13 @@ final class Paper
         $stmt->execute(['max_marks' => $maxMarks, 'id' => $paperId]);
     }
 
+    /** Edits how long a paper is meant to take, in minutes - purely informational (nothing enforces it as a countdown), editable any time regardless of paper type. */
+    public static function setDuration(int $paperId, ?int $minutes): void
+    {
+        $stmt = Database::connection()->prepare('UPDATE papers SET duration_minutes = :minutes WHERE id = :id');
+        $stmt->execute(['minutes' => $minutes, 'id' => $paperId]);
+    }
+
     public static function setGroup(int $paperId, ?int $groupId): void
     {
         $stmt = Database::connection()->prepare('UPDATE papers SET group_id = :group_id WHERE id = :id');
