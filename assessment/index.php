@@ -137,7 +137,7 @@ $routes = [
 
     ['POST', '/teacher/stamps/add', [StampController::class, 'add']],
     ['POST', '/teacher/stamps/{id}/delete', [StampController::class, 'delete']],
-    ['POST', '/teacher/stamps/shortcut', [StampController::class, 'setShortcut']],
+    ['POST', '/teacher/stamps/shortcuts', [StampController::class, 'setShortcuts']],
 
     ['GET', '/teacher/moderation/queue', [ModerationController::class, 'myQueue']],
     ['GET', '/teacher/moderation/flagged', [ModerationController::class, 'flagged']],

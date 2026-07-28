@@ -232,6 +232,24 @@ input[type="file"], select, textarea {
 .stamp-add-form input[type="text"] { width: auto; flex: 1; margin: 0; }
 .stamp-add-form button { border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-panel); color: var(--color-text) !important; font-size: 0.85rem !important; padding: 0.3rem 0.5rem !important; }
 
+/* One shared form for every shortcut row (see stamp_toolbar.php) - overrides
+   the ".stamp-manage-menu form" flex-row default above, since this form is a
+   stacked column of rows plus a single submit button, not one row itself. */
+.shortcuts-form { display: flex; flex-direction: column; gap: 0.15rem; padding: 0; }
+.shortcut-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.15rem 0.4rem; }
+.shortcut-row span { font-size: 0.9rem; }
+.shortcut-row input[type="text"] { width: 2.5rem; margin: 0; text-align: center; }
+.shortcuts-form > button[type="submit"] {
+    margin-top: 0.4rem;
+    border: 1px solid var(--color-primary) !important;
+    border-radius: 6px;
+    background: var(--color-primary) !important;
+    color: var(--color-primary-contrast) !important;
+    font-size: 0.85rem !important;
+    padding: 0.4rem 0.6rem !important;
+    cursor: pointer;
+}
+
 /* Per-page mark entry on whole-paper/no-question papers - see setupPageMarks()
    in canvas-annotate.js, which builds these rows once the PDF page count is known.
    A grid (not flex) so it stays a single tight row even in the mark-pane's narrow

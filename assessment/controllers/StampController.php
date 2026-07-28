@@ -9,17 +9,40 @@ require_once __DIR__ . '/../models/StampShortcut.php';
 /** Per-marker custom quick-stamps for marking (SRS 7.1) - see CustomStamp model. */
 final class StampController
 {
-    /** Sets or clears (empty key) a keyboard shortcut for one stamp or annotation tool - see StampShortcut. */
-    public static function setShortcut(): void
+    /**
+     * Saves every shortcut in the "Keyboard shortcuts" dropdown in one submit,
+     * rather than a separate save per row - see partials/stamp_toolbar.php.
+     * Expects $_POST['shortcuts'] = ['tool' => [toolName => key], 'stamp' =>
+     * [builtInLabel => key], 'custom' => [customStampId => key]]. A blank key
+     * clears that shortcut (StampShortcut::set() already treats '' as clear).
+     * Custom stamps are keyed by id, not label - CustomStamp doesn't enforce
+     * unique labels per user, so two custom stamps could otherwise collide
+     * under the same array key.
+     */
+    public static function setShortcuts(): void
     {
         $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         AuthController::verifyCsrf();
+        $userId = (int) $user['id'];
 
-        $targetType = ($_POST['target_type'] ?? '') === StampShortcut::TARGET_TOOL ? StampShortcut::TARGET_TOOL : StampShortcut::TARGET_STAMP;
-        $label = trim((string) ($_POST['stamp_label'] ?? ''));
-        $key = trim((string) ($_POST['shortcut_key'] ?? ''));
-        if ($label !== '') {
-            StampShortcut::set((int) $user['id'], $targetType, $label, $key);
+        $submitted = (array) ($_POST['shortcuts'] ?? []);
+
+        foreach ((array) ($submitted[StampShortcut::TARGET_TOOL] ?? []) as $tool => $key) {
+            StampShortcut::set($userId, StampShortcut::TARGET_TOOL, (string) $tool, trim((string) $key));
+        }
+        foreach ((array) ($submitted[StampShortcut::TARGET_STAMP] ?? []) as $label => $key) {
+            StampShortcut::set($userId, StampShortcut::TARGET_STAMP, (string) $label, trim((string) $key));
+        }
+
+        $customLabelsById = [];
+        foreach (CustomStamp::forUser($userId) as $s) {
+            $customLabelsById[(int) $s['id']] = $s['label'];
+        }
+        foreach ((array) ($submitted['custom'] ?? []) as $stampId => $key) {
+            $label = $customLabelsById[(int) $stampId] ?? null;
+            if ($label !== null) {
+                StampShortcut::set($userId, StampShortcut::TARGET_STAMP, $label, trim((string) $key));
+            }
         }
 
         self::redirectBack();
