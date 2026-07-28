@@ -11,6 +11,7 @@
 /** @var bool $gradesReleased */
 /** @var string|null $releasedGrade */
 /** @var array $releasedBoundaries highest grade first */
+/** @var bool $isSelfService */
 $__title = 'Submission summary';
 require __DIR__ . '/../partials/header.php';
 
@@ -41,7 +42,28 @@ $hasScanOrPdf = $paper['type'] === 'pdf' || !empty($submission['scan_drive_item_
         <?php endif; ?>
     <?php endif; ?>
 
-    <?php if ($showFinalMarks && $questions): ?>
+    <?php if ($showFinalMarks && $isSelfService && $questions): ?>
+        <p class="autosave-status">This was a practice paper you self-marked - there's no teacher mark, only your own.</p>
+        <table class="data-table">
+            <thead><tr><th>Question</th><th>Your self-mark</th><th>Max</th></tr></thead>
+            <tbody>
+            <?php $total = 0; $max = 0; foreach ($questions as $q): $qid = (int) $q['id']; $total += (float) ($selfMarks[$qid]['student_mark'] ?? 0); $max += (float) $q['max_marks']; ?>
+                <tr>
+                    <td><?= htmlspecialchars($q['section'] ?? ('Q' . $qid)) ?></td>
+                    <td class="self-mark-note"><?= htmlspecialchars((string) ($selfMarks[$qid]['student_mark'] ?? '—')) ?></td>
+                    <td><?= htmlspecialchars((string) $q['max_marks']) ?></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+            <tfoot><tr><td></td><td><strong><?= $total ?></strong></td><td><strong><?= $max ?></strong></td></tr></tfoot>
+        </table>
+    <?php elseif ($showFinalMarks && $isSelfService): ?>
+        <p class="autosave-status">This was a practice paper you self-marked - there's no teacher mark, only your own.</p>
+        <p>Your self-assessed mark: <strong class="self-mark-note"><?= htmlspecialchars((string) ($selfMarks['overall']['student_mark'] ?? '—')) ?> / <?= htmlspecialchars((string) ($paper['max_marks'] ?? '—')) ?></strong></p>
+        <?php if (!empty($selfMarks['overall']['reflection_comment'])): ?>
+            <p>Your reflection: <?= nl2br(htmlspecialchars($selfMarks['overall']['reflection_comment'])) ?></p>
+        <?php endif; ?>
+    <?php elseif ($showFinalMarks && $questions): ?>
         <table class="data-table">
             <thead><tr><th>Question</th><th>Your self-mark</th><th>Teacher mark</th><th>Max</th></tr></thead>
             <tbody>

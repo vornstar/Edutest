@@ -46,6 +46,13 @@ final class MarkingController
             exit;
         }
         $assignment = TestAssignment::find((int) $submission['assignment_id']);
+        // Self-service assignments (see TestController::releaseSelfService) are
+        // student-self-marked only by design - there is no teacher marking step
+        // for them at all, so this 404s the same as any other non-existent case.
+        if ($assignment && ($assignment['mode'] ?? 'assigned') === 'self_service') {
+            http_response_code(404);
+            exit;
+        }
         $paper = Paper::find((int) $assignment['paper_id']);
         if (!$paper || !PaperController::canManagePaper($user, $paper)) {
             http_response_code(404);

@@ -5,11 +5,11 @@ require_once __DIR__ . '/Database.php';
 
 final class TestAssignment
 {
-    public static function create(int $paperId, ?int $classId, int $assignedBy, ?string $dueAt, bool $syncToTeams, bool $selfMarkingEnabled = false): int
+    public static function create(int $paperId, ?int $classId, int $assignedBy, ?string $dueAt, bool $syncToTeams, bool $selfMarkingEnabled = false, string $mode = 'assigned'): int
     {
         $stmt = Database::connection()->prepare(
-            'INSERT INTO test_assignments (paper_id, class_id, assigned_by, due_at, sync_to_teams, self_marking_enabled)
-             VALUES (:paper_id, :class_id, :assigned_by, :due_at, :sync_to_teams, :self_marking_enabled)'
+            'INSERT INTO test_assignments (paper_id, class_id, assigned_by, due_at, sync_to_teams, self_marking_enabled, mode)
+             VALUES (:paper_id, :class_id, :assigned_by, :due_at, :sync_to_teams, :self_marking_enabled, :mode)'
         );
         $stmt->execute([
             'paper_id' => $paperId,
@@ -18,6 +18,7 @@ final class TestAssignment
             'due_at' => $dueAt,
             'sync_to_teams' => $syncToTeams ? 1 : 0,
             'self_marking_enabled' => $selfMarkingEnabled ? 1 : 0,
+            'mode' => $mode,
         ]);
         return (int) Database::connection()->lastInsertId();
     }

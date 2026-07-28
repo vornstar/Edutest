@@ -151,6 +151,7 @@ CREATE TABLE IF NOT EXISTS test_assignments (
     status              ENUM('assigned','submitted','graded') NOT NULL DEFAULT 'assigned',
     sync_to_teams       TINYINT(1) NOT NULL DEFAULT 0,
     self_marking_enabled TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'Set at assign-time or toggled afterward (see TestAssignment::setSelfMarking) - per-assignment, not per-paper, so a teacher can withhold it until everyone has finished',
+    mode                ENUM('assigned','self_service') NOT NULL DEFAULT 'assigned' COMMENT 'self_service = teacher released this paper to the class to attempt and self-mark independently (see TestController::releaseSelfService) - always self_marking_enabled, never enters the marking/moderation queue, and the resolved grade comes from the student''s own self-mark total rather than a teacher mark. assigned = the normal single-paper, teacher-marked flow.',
     closed_at           DATETIME NULL COMMENT 'NULL = open (accepting student work). Set/cleared via TestAssignment::close()/reopen() - lets a teacher end a test window early or reopen it, independent of due_at.',
     cancelled_at        DATETIME NULL COMMENT 'NULL = active. Set/cleared via TestAssignment::cancel()/restore() - a soft delete: hides the assignment from the student entirely and removes it from Teams if it was pushed there, but nothing (submissions, marks, annotations) is ever actually deleted.',
     grade_released_at   DATETIME NULL COMMENT 'NULL = not released. Set/cleared via TestAssignment::releaseGrades()/unreleaseGrades() - once set, every student on this assignment can see their own resolved grade (see GradeBoundary) and the boundary table it came from, on their submission page.',
@@ -188,7 +189,7 @@ CREATE TABLE IF NOT EXISTS answers (
 CREATE TABLE IF NOT EXISTS self_marks (
     id                  INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     submission_id       INT UNSIGNED NOT NULL,
-    question_id         INT UNSIGNED NOT NULL,
+    question_id         INT UNSIGNED NULL COMMENT 'NULL for a whole-paper overall self-mark (pdf-type papers with no question breakdown) - mirrors marks.question_id',
     student_mark        DECIMAL(5,2) NOT NULL,
     reflection_cipher   MEDIUMBLOB NULL COMMENT 'AES-256-GCM encrypted student reflection comment',
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

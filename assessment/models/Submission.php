@@ -99,9 +99,35 @@ final class Submission
         $stmt->execute(['status' => $status, 'id' => $submissionId]);
     }
 
-    public static function recordSelfMark(int $submissionId, int $questionId, float $studentMark, ?string $reflection): void
+    /**
+     * $questionId null records a whole-paper overall self-mark (pdf-type
+     * papers with no question breakdown), mirroring Mark::record()'s same
+     * null-question convention. Handled with an explicit existence check
+     * rather than relying on self_marks' own ON DUPLICATE KEY UPDATE for
+     * that case - MySQL treats every NULL as distinct in a UNIQUE index,
+     * so two NULL-question rows for the same submission would never
+     * "conflict" and upsert in place the way two same-question rows do.
+     */
+    public static function recordSelfMark(int $submissionId, ?int $questionId, float $studentMark, ?string $reflection): void
     {
-        $stmt = Database::connection()->prepare(
+        $pdo = Database::connection();
+
+        if ($questionId === null) {
+            $existing = $pdo->prepare('SELECT id FROM self_marks WHERE submission_id = :submission_id AND question_id IS NULL');
+            $existing->execute(['submission_id' => $submissionId]);
+            $existingId = $existing->fetchColumn();
+
+            if ($existingId !== false) {
+                $pdo->prepare('UPDATE self_marks SET student_mark = :student_mark, reflection_cipher = :reflection_cipher WHERE id = :id')
+                    ->execute(['student_mark' => $studentMark, 'reflection_cipher' => Crypto::encrypt($reflection), 'id' => $existingId]);
+            } else {
+                $pdo->prepare('INSERT INTO self_marks (submission_id, question_id, student_mark, reflection_cipher) VALUES (:submission_id, NULL, :student_mark, :reflection_cipher)')
+                    ->execute(['submission_id' => $submissionId, 'student_mark' => $studentMark, 'reflection_cipher' => Crypto::encrypt($reflection)]);
+            }
+            return;
+        }
+
+        $stmt = $pdo->prepare(
             'INSERT INTO self_marks (submission_id, question_id, student_mark, reflection_cipher)
              VALUES (:submission_id, :question_id, :student_mark, :reflection_cipher)
              ON DUPLICATE KEY UPDATE student_mark = VALUES(student_mark), reflection_cipher = VALUES(reflection_cipher)'
@@ -114,7 +140,7 @@ final class Submission
         ]);
     }
 
-    /** @return array<int,array> keyed by question_id, each row's 'reflection_comment' decrypted transparently */
+    /** @return array<int|string,array> keyed by question_id, or the string 'overall' for a whole-paper self-mark - each row's 'reflection_comment' decrypted transparently */
     public static function selfMarks(int $submissionId): array
     {
         $stmt = Database::connection()->prepare('SELECT * FROM self_marks WHERE submission_id = :submission_id');
@@ -124,15 +150,35 @@ final class Submission
         foreach ($rows as $row) {
             $row['reflection_comment'] = Crypto::decrypt($row['reflection_cipher']);
             unset($row['reflection_cipher']);
-            $byQuestion[(int) $row['question_id']] = $row;
+            $key = $row['question_id'] !== null ? (int) $row['question_id'] : 'overall';
+            $byQuestion[$key] = $row;
         }
         return $byQuestion;
     }
 
-    /** Marks the submission as pending teacher moderation once self-marking is complete. */
+    /** Sum of every self-mark recorded for this submission - the "grade" for a self-service assignment (see GradeBoundary), since there's no teacher mark to total instead. */
+    public static function selfMarkTotal(int $submissionId): float
+    {
+        $stmt = Database::connection()->prepare('SELECT SUM(student_mark) AS total FROM self_marks WHERE submission_id = :submission_id');
+        $stmt->execute(['submission_id' => $submissionId]);
+        return (float) ($stmt->fetchColumn() ?: 0);
+    }
+
+    /**
+     * Marks self-marking complete. For a normal assignment this hands off
+     * to teacher moderation (status 'pending_moderation'); for a
+     * self-service one there is no marking/moderation step at all, so it
+     * goes straight to the terminal 'self_marked' status instead - see
+     * TestController::selfMarkSubmit for which one actually gets called.
+     */
     public static function completeSelfMarking(int $submissionId): void
     {
         self::setStatus($submissionId, 'pending_moderation');
+    }
+
+    public static function completeSelfServiceMarking(int $submissionId): void
+    {
+        self::setStatus($submissionId, 'self_marked');
     }
 
     /** Another submission still awaiting marking for the same paper (any class it's assigned to) - powers the "Next unmarked" button so a teacher can work through a batch without returning to the queue each time. */
@@ -142,7 +188,7 @@ final class Submission
             'SELECT s.id FROM submissions s
              INNER JOIN test_assignments a ON a.id = s.assignment_id
              WHERE a.paper_id = :paper_id AND s.id != :current_id AND s.status IN ("submitted", "pending_moderation")
-             AND a.cancelled_at IS NULL
+             AND a.cancelled_at IS NULL AND a.mode != "self_service"
              ORDER BY s.submitted_at ASC LIMIT 1'
         );
         $stmt->execute(['paper_id' => $paperId, 'current_id' => $currentSubmissionId]);

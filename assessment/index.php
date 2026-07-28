@@ -108,6 +108,8 @@ $routes = [
     ['GET', '/teacher/papers/{id}/assign', [TestController::class, 'assignForm']],
     ['POST', '/teacher/papers/{id}/assign', [TestController::class, 'assign']],
     ['POST', '/teacher/assignments/{id}/self-marking', [TestController::class, 'toggleSelfMarking']],
+    ['GET', '/teacher/self-service', [TestController::class, 'selfServiceForm']],
+    ['POST', '/teacher/self-service', [TestController::class, 'releaseSelfService']],
     ['GET', '/teacher/open-tests', [TestController::class, 'openTests']],
     ['POST', '/teacher/assignments/{id}/close', [TestController::class, 'closeTest']],
     ['POST', '/teacher/assignments/{id}/reopen', [TestController::class, 'reopenTest']],

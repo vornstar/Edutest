@@ -181,6 +181,60 @@ final class TestController
     }
 
     /**
+     * "Release a selection of papers to a class" for self-service: each
+     * paper picked becomes its own assignment (mode='self_service') with
+     * self-marking always on and no teacher marking/moderation step at
+     * all - see MarkingController::requireMarkable, Submission::
+     * completeSelfServiceMarking. Grade boundaries can optionally be
+     * released for all of them immediately, since there's no marking
+     * delay to wait out here.
+     */
+    public static function selfServiceForm(): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        $classes = ClassRoster::forTeacher((int) $user['id']);
+        $papers = array_values(array_filter(
+            Paper::visibleTo($user),
+            static fn(array $p): bool => PaperController::canManagePaper($user, $p)
+        ));
+        require_once __DIR__ . '/../models/PaperGroup.php';
+        $groups = PaperGroup::all();
+        require __DIR__ . '/../views/teacher/self_service_form.php';
+    }
+
+    public static function releaseSelfService(): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        AuthController::verifyCsrf();
+
+        $classId = (int) ($_POST['class_id'] ?? 0);
+        $class = ClassRoster::find($classId);
+        if (!$class) {
+            http_response_code(404);
+            exit;
+        }
+
+        $dueAt = !empty($_POST['due_at']) ? (string) $_POST['due_at'] : null;
+        $releaseGradeBoundaries = !empty($_POST['release_grade_boundaries']);
+
+        $released = 0;
+        foreach (array_map('intval', (array) ($_POST['paper_ids'] ?? [])) as $paperId) {
+            // 404s if this paper isn't actually manageable by this user - never trust
+            // the raw POSTed ids, same guard selfServiceForm()'s own picker relies on.
+            PaperController::requireManageable($paperId, $user);
+
+            $assignmentId = TestAssignment::create($paperId, $classId, (int) $user['id'], $dueAt, false, true, 'self_service');
+            if ($releaseGradeBoundaries) {
+                TestAssignment::releaseGrades($assignmentId);
+            }
+            $released++;
+        }
+
+        header('Location: /assessment/teacher/open-tests?self_service_released=' . $released);
+        exit;
+    }
+
+    /**
      * Every real test window this teacher-portal user has open right now,
      * with a quick progress readout per one - answers "what tests do I
      * still have running?" without having to check each class page.
@@ -564,7 +618,20 @@ final class TestController
             Submission::recordSelfMark($submissionId, (int) $questionId, (float) $mark, $reflection !== null ? (string) $reflection : null);
         }
 
-        Submission::completeSelfMarking($submissionId);
+        // Whole-paper self-mark (pdf-type papers with no question breakdown) - mirrors
+        // MarkingController::saveMark's overall_score/overall_comment handling.
+        if (isset($_POST['overall_mark']) && $_POST['overall_mark'] !== '') {
+            $reflection = $_POST['overall_reflection'] ?? null;
+            Submission::recordSelfMark($submissionId, null, (float) $_POST['overall_mark'], $reflection !== null ? (string) $reflection : null);
+        }
+
+        $assignment = TestAssignment::find((int) $submission['assignment_id']);
+        if ($assignment && ($assignment['mode'] ?? 'assigned') === 'self_service') {
+            Submission::completeSelfServiceMarking($submissionId);
+        } else {
+            Submission::completeSelfMarking($submissionId);
+        }
+
         header('Location: /assessment/student/submissions/' . $submissionId);
         exit;
     }

@@ -1,5 +1,6 @@
 <?php
-/** @var array $assignments */
+/** @var array $assignments formally assigned tests only */
+/** @var array $selfServiceAssignments self-service/practice papers only */
 /** @var array $submissions */
 $__title = 'My Tests';
 require __DIR__ . '/../partials/header.php';
@@ -8,13 +9,13 @@ $submittedByAssignment = [];
 foreach ($submissions as $s) {
     $submittedByAssignment[(int) $s['assignment_id']] = $s;
 }
-?>
-<div class="panel">
-    <h1>My tests</h1>
+
+$renderTable = static function (array $rows) use ($submittedByAssignment): void {
+    ?>
     <table class="data-table">
         <thead><tr><th>Paper</th><th>Type</th><th>Due</th><th>Status</th><th></th></tr></thead>
         <tbody>
-        <?php foreach ($assignments as $a): $sub = $submittedByAssignment[(int) $a['id']] ?? null; ?>
+        <?php foreach ($rows as $a): $sub = $submittedByAssignment[(int) $a['id']] ?? null; ?>
             <tr>
                 <td><?= htmlspecialchars($a['title']) ?></td>
                 <td><?= htmlspecialchars($a['type']) ?></td>
@@ -29,10 +30,24 @@ foreach ($submissions as $s) {
                 </td>
             </tr>
         <?php endforeach; ?>
-        <?php if (!$assignments): ?>
-            <tr><td colspan="5">No tests assigned yet.</td></tr>
+        <?php if (!$rows): ?>
+            <tr><td colspan="5">Nothing here yet.</td></tr>
         <?php endif; ?>
         </tbody>
     </table>
+    <?php
+};
+?>
+<div class="panel">
+    <h1>My tests</h1>
+    <?php $renderTable($assignments); ?>
 </div>
+
+<?php if ($selfServiceAssignments): ?>
+<div class="panel">
+    <h1>Practice papers</h1>
+    <p class="autosave-status">Attempt these whenever you like, then self-mark them against the official mark scheme - nothing here is formally due.</p>
+    <?php $renderTable($selfServiceAssignments); ?>
+</div>
+<?php endif; ?>
 <?php require __DIR__ . '/../partials/footer.php'; ?>

@@ -10,7 +10,7 @@ require_once __DIR__ . '/../../models/Question.php';
 ?>
 <div class="panel">
     <h1>Self-marking</h1>
-    <p>Compare your answers against the official mark scheme, then enter the mark you believe you earned and a short reflection for each question. Your teacher will review and moderate these marks.</p>
+    <p>Compare your answer against the official mark scheme, then enter the mark you believe you earned and a short reflection.</p>
 
     <form method="post" action="/assessment/student/submissions/<?= (int) $submission['id'] ?>/self-mark">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
@@ -35,16 +35,23 @@ require_once __DIR__ . '/../../models/Question.php';
             </fieldset>
         <?php endforeach; ?>
 
-        <?php if ($questions): ?>
-            <button type="submit" class="btn btn-primary">Submit self-assessment</button>
+        <?php if (!$questions): ?>
+            <fieldset class="question-block">
+                <legend>Overall self-mark<?= $paper['max_marks'] !== null ? ' (out of ' . htmlspecialchars((string) $paper['max_marks']) . ')' : '' ?></legend>
+                <?php if ($paper['type'] === 'pdf' && !empty($paper['mark_scheme_drive_item_id'])): ?>
+                    <p><a class="btn" href="/assessment/student/submissions/<?= (int) $submission['id'] ?>/mark-scheme" target="_blank">View mark scheme</a></p>
+                <?php endif; ?>
+                <label>Self-assessed mark
+                    <input type="number" step="0.5" min="0" <?= $paper['max_marks'] !== null ? 'max="' . htmlspecialchars((string) $paper['max_marks']) . '"' : '' ?>
+                           name="overall_mark" value="<?= htmlspecialchars((string) ($selfMarks['overall']['student_mark'] ?? '')) ?>" required>
+                </label>
+                <label>Reflection comment
+                    <textarea name="overall_reflection" rows="3"><?= htmlspecialchars($selfMarks['overall']['reflection_comment'] ?? '') ?></textarea>
+                </label>
+            </fieldset>
         <?php endif; ?>
-    </form>
 
-    <?php if (!$questions): ?>
-        <?php if ($paper['type'] === 'pdf' && !empty($paper['mark_scheme_drive_item_id'])): ?>
-            <p><a class="btn" href="/assessment/student/submissions/<?= (int) $submission['id'] ?>/mark-scheme" target="_blank">View mark scheme</a></p>
-        <?php endif; ?>
-        <p>This paper doesn't have a question-by-question breakdown to self-mark against - your teacher will give you an overall mark and feedback instead.</p>
-    <?php endif; ?>
+        <button type="submit" class="btn btn-primary">Submit self-assessment</button>
+    </form>
 </div>
 <?php require __DIR__ . '/../partials/footer.php'; ?>

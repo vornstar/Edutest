@@ -18,12 +18,17 @@ require __DIR__ . '/../partials/header.php';
         and the boundary table it came from.
     </p>
 
+    <?php if (isset($_GET['self_service_released'])): ?>
+        <p class="autosave-status">Released <?= (int) $_GET['self_service_released'] ?> paper(s) for self-service.</p>
+    <?php endif; ?>
+
     <table class="data-table">
-        <thead><tr><th>Paper</th><th>Class</th><th>Due</th><th>Progress</th><th>Status</th><th>Grades</th><th></th></tr></thead>
+        <thead><tr><th>Paper</th><th>Mode</th><th>Class</th><th>Due</th><th>Progress</th><th>Status</th><th>Grades</th><th></th></tr></thead>
         <tbody>
         <?php foreach ($assignments as $a): $p = $progress[(int) $a['id']]; $isClosed = !empty($a['closed_at']); $gradesReleased = !empty($a['grade_released_at']); ?>
             <tr>
                 <td><?= htmlspecialchars($a['paper_title']) ?></td>
+                <td><?= ($a['mode'] ?? 'assigned') === 'self_service' ? 'Self-service' : 'Assigned' ?></td>
                 <td><?= htmlspecialchars($a['class_name']) ?></td>
                 <td><?= htmlspecialchars($a['due_at'] ?? '—') ?></td>
                 <td><?= (int) $p['started'] ?>/<?= (int) $p['roster'] ?> started &middot; <?= (int) $p['completed'] ?> submitted or further</td>
@@ -47,7 +52,7 @@ require __DIR__ . '/../partials/header.php';
             </tr>
         <?php endforeach; ?>
         <?php if (!$assignments): ?>
-            <tr><td colspan="7">No tests assigned to a class yet.</td></tr>
+            <tr><td colspan="8">No tests assigned to a class yet.</td></tr>
         <?php endif; ?>
         </tbody>
     </table>

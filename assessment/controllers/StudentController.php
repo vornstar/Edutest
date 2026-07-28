@@ -17,7 +17,9 @@ final class StudentController
     public static function dashboard(): void
     {
         $user = AuthController::requireRole([User::ROLE_STUDENT]);
-        $assignments = TestAssignment::forStudent((int) $user['id']);
+        $allAssignments = TestAssignment::forStudent((int) $user['id']);
+        $assignments = array_values(array_filter($allAssignments, static fn(array $a): bool => ($a['mode'] ?? 'assigned') !== 'self_service'));
+        $selfServiceAssignments = array_values(array_filter($allAssignments, static fn(array $a): bool => ($a['mode'] ?? 'assigned') === 'self_service'));
         $submissions = Submission::forStudent((int) $user['id']);
         require __DIR__ . '/../views/student/dashboard.php';
     }
@@ -61,8 +63,14 @@ final class StudentController
         $answers = Submission::answers($submissionId);
         $selfMarks = Submission::selfMarks($submissionId);
 
-        $showFinalMarks = in_array($submission['status'], ['marked', 'moderated'], true);
-        $finalMarks = $showFinalMarks ? Mark::latestForSubmission($submissionId, 'primary') : [];
+        // A self-service assignment (see TestController::releaseSelfService) has no
+        // teacher marking step at all - its own terminal status is 'self_marked', and
+        // "final" means the student's own self-mark, not a teacher's.
+        $isSelfService = ($assignment['mode'] ?? 'assigned') === 'self_service';
+        $showFinalMarks = $isSelfService
+            ? $submission['status'] === 'self_marked'
+            : in_array($submission['status'], ['marked', 'moderated'], true);
+        $finalMarks = ($showFinalMarks && !$isSelfService) ? Mark::latestForSubmission($submissionId, 'primary') : [];
         $annotations = $showFinalMarks ? Annotation::forSubmission($submissionId) : [];
 
         // Only ever shown once the teacher has explicitly released grades for THIS
@@ -75,7 +83,8 @@ final class StudentController
             $releasedBoundaries = GradeBoundary::resolveForPaper($paper);
             $maxMarksTotal = Paper::maxMarksFor($paper, $questions);
             if ($releasedBoundaries && $maxMarksTotal > 0) {
-                $releasedGrade = GradeBoundary::gradeForPercent($releasedBoundaries, Mark::totalScore($submissionId, 'primary') / $maxMarksTotal * 100);
+                $achievedScore = $isSelfService ? Submission::selfMarkTotal($submissionId) : Mark::totalScore($submissionId, 'primary');
+                $releasedGrade = GradeBoundary::gradeForPercent($releasedBoundaries, $achievedScore / $maxMarksTotal * 100);
             }
         }
 
