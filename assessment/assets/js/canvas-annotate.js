@@ -181,6 +181,10 @@
                     var stampPointer = fabricCanvas.getPointer(opt.e);
                     var stamp = new fabric.IText(currentStampLabel, {
                         left: stampPointer.x, top: stampPointer.y, fill: currentColor(), fontSize: 26, fontWeight: 'bold',
+                        // left/top otherwise anchor the box's top-left corner,
+                        // not its centre - without this a stamp visibly lands
+                        // below and to the right of where the marker clicked.
+                        originX: 'center', originY: 'center',
                     });
                     fabricCanvas.add(stamp);
                     fabricCanvas.setActiveObject(stamp);
