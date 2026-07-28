@@ -14,6 +14,7 @@
 /** @var int|null $selectedStudentVersion */
 /** @var bool $viewingOldStudentVersion */
 /** @var array $markSchemes keyed by question_id */
+/** @var string|null $currentGrade live-preview grade from whatever's currently saved, or null if this paper has no grade boundaries (or no max marks set) */
 /** @var int|null $nextUnmarkedId */
 /** @var array $customStamps each: ['id' => int, 'label' => string] */
 $__title = 'Marking';
@@ -84,6 +85,9 @@ $hasTypedAnswers = $paper['type'] === 'digital' && empty($submission['scan_drive
         </div>
 
         <div class="mark-pane">
+            <?php if ($currentGrade !== null): ?>
+                <p class="autosave-status"><strong>Current grade: <?= htmlspecialchars($currentGrade) ?></strong> (from whatever's saved so far - updates each time you save marks)</p>
+            <?php endif; ?>
             <form method="post" action="/assessment/teacher/marking/<?= (int) $submission['id'] ?>">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
 

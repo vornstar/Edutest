@@ -107,6 +107,19 @@ final class TestAssignment
         $stmt->execute(['id' => $id]);
     }
 
+    /** Releases every student's resolved grade (see GradeBoundary) and the boundary table it came from - shown on their own submission page once set. */
+    public static function releaseGrades(int $id): void
+    {
+        $stmt = Database::connection()->prepare('UPDATE test_assignments SET grade_released_at = NOW() WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+    }
+
+    public static function unreleaseGrades(int $id): void
+    {
+        $stmt = Database::connection()->prepare('UPDATE test_assignments SET grade_released_at = NULL WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+    }
+
     /**
      * Soft-deletes an assignment: hides it from the student entirely (see
      * TestController::take()/requireOpenAssignment()) - nothing under it

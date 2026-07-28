@@ -13,23 +13,30 @@ require __DIR__ . '/../partials/header.php';
         the same as anyone who hasn't started. Reopen one any time, e.g. for an agreed extension.
         Cancelling removes it from the class entirely instead - it disappears from students' lists (and
         from Teams if it was pushed there), without deleting any submissions, marks or annotations
-        underneath it. A cancelled test can be restored from Deleted tests below.
+        underneath it. A cancelled test can be restored from Deleted tests below. Releasing grades lets
+        every student on this test see their own resolved grade (if the paper has grade boundaries set)
+        and the boundary table it came from.
     </p>
 
     <table class="data-table">
-        <thead><tr><th>Paper</th><th>Class</th><th>Due</th><th>Progress</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Paper</th><th>Class</th><th>Due</th><th>Progress</th><th>Status</th><th>Grades</th><th></th></tr></thead>
         <tbody>
-        <?php foreach ($assignments as $a): $p = $progress[(int) $a['id']]; $isClosed = !empty($a['closed_at']); ?>
+        <?php foreach ($assignments as $a): $p = $progress[(int) $a['id']]; $isClosed = !empty($a['closed_at']); $gradesReleased = !empty($a['grade_released_at']); ?>
             <tr>
                 <td><?= htmlspecialchars($a['paper_title']) ?></td>
                 <td><?= htmlspecialchars($a['class_name']) ?></td>
                 <td><?= htmlspecialchars($a['due_at'] ?? '—') ?></td>
                 <td><?= (int) $p['started'] ?>/<?= (int) $p['roster'] ?> started &middot; <?= (int) $p['completed'] ?> submitted or further</td>
                 <td><?= $isClosed ? 'Closed (' . htmlspecialchars($a['closed_at']) . ')' : 'Open' ?></td>
+                <td><?= $gradesReleased ? 'Released' : 'Not released' ?></td>
                 <td>
                     <form method="post" action="/assessment/teacher/assignments/<?= (int) $a['id'] ?>/<?= $isClosed ? 'reopen' : 'close' ?>" style="display:inline">
                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
                         <button type="submit" class="btn <?= $isClosed ? '' : 'btn-danger' ?>"><?= $isClosed ? 'Reopen' : 'Close now' ?></button>
+                    </form>
+                    <form method="post" action="/assessment/teacher/assignments/<?= (int) $a['id'] ?>/<?= $gradesReleased ? 'unrelease-grades' : 'release-grades' ?>" style="display:inline">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
+                        <button type="submit" class="btn"><?= $gradesReleased ? 'Unrelease grades' : 'Release grades' ?></button>
                     </form>
                     <a class="btn" href="/assessment/teacher/papers/<?= (int) $a['paper_id'] ?>/results">Results</a>
                     <form method="post" action="/assessment/teacher/assignments/<?= (int) $a['id'] ?>/cancel" style="display:inline" onsubmit="return confirm('Cancel this test? It will disappear from students\' lists and be removed from Teams if it was pushed there. Nothing is deleted - you can restore it from Deleted tests.');">
@@ -40,7 +47,7 @@ require __DIR__ . '/../partials/header.php';
             </tr>
         <?php endforeach; ?>
         <?php if (!$assignments): ?>
-            <tr><td colspan="6">No tests assigned to a class yet.</td></tr>
+            <tr><td colspan="7">No tests assigned to a class yet.</td></tr>
         <?php endif; ?>
         </tbody>
     </table>

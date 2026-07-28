@@ -46,6 +46,42 @@ final class Paper
         $stmt->execute(['group_id' => $groupId, 'id' => $paperId]);
     }
 
+    /** A paper's total available marks: SUM of its questions' max_marks for a digital paper, or its own max_marks field for a pdf paper - the single "out of X" figure results, Teams grade sync, and grade boundaries all resolve against. 0.0 if not computable (a pdf paper with no max_marks set yet). */
+    public static function maxMarksFor(array $paper, array $questions): float
+    {
+        if ($questions) {
+            return (float) array_sum(array_column($questions, 'max_marks'));
+        }
+        return (float) ($paper['max_marks'] ?? 0);
+    }
+
+    public static function setGradeBoundarySource(int $paperId, ?int $sourcePaperId): void
+    {
+        $stmt = Database::connection()->prepare('UPDATE papers SET grade_boundary_source_paper_id = :source WHERE id = :id');
+        $stmt->execute(['source' => $sourcePaperId, 'id' => $paperId]);
+    }
+
+    /**
+     * Candidate papers this paper could borrow grade boundaries from: same
+     * group, own boundaries directly defined (not themselves borrowing -
+     * keeps resolution to one hop, see GradeBoundary::resolveForPaper),
+     * alphabetical by title. Empty if this paper isn't in a group at all.
+     */
+    public static function forGroupWithOwnBoundaries(?int $groupId, int $excludePaperId): array
+    {
+        if ($groupId === null) {
+            return [];
+        }
+        $stmt = Database::connection()->prepare(
+            'SELECT DISTINCT p.* FROM papers p
+             INNER JOIN grade_boundaries gb ON gb.paper_id = p.id
+             WHERE p.group_id = :group_id AND p.id != :exclude_id AND p.grade_boundary_source_paper_id IS NULL
+             ORDER BY p.title ASC'
+        );
+        $stmt->execute(['group_id' => $groupId, 'exclude_id' => $excludePaperId]);
+        return $stmt->fetchAll();
+    }
+
     public static function find(int $id): ?array
     {
         $stmt = Database::connection()->prepare('SELECT * FROM papers WHERE id = :id');

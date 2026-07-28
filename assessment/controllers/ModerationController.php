@@ -5,6 +5,7 @@ require_once __DIR__ . '/AuthController.php';
 require_once __DIR__ . '/../models/Submission.php';
 require_once __DIR__ . '/../models/Moderation.php';
 require_once __DIR__ . '/../models/Mark.php';
+require_once __DIR__ . '/../models/GradeBoundary.php';
 require_once __DIR__ . '/../models/Question.php';
 require_once __DIR__ . '/../models/TestAssignment.php';
 require_once __DIR__ . '/../models/Paper.php';
@@ -91,6 +92,15 @@ final class ModerationController
             $markSchemes[(int) $q['id']] = Question::decryptedMarkScheme($q);
         }
         $customStamps = CustomStamp::forUser((int) $user['id']);
+
+        // Live, best-effort preview of the resolved grade from whatever's currently
+        // saved for THIS moderation pass - see MarkingController::markSubmission for the
+        // matching primary-marking preview.
+        $maxMarksTotal = Paper::maxMarksFor($paper, $questions);
+        $boundaries = GradeBoundary::resolveForPaper($paper);
+        $currentGrade = ($boundaries && $maxMarksTotal > 0)
+            ? GradeBoundary::gradeForPercent($boundaries, Mark::totalScore((int) $submission['id'], 'moderation') / $maxMarksTotal * 100)
+            : null;
 
         require __DIR__ . '/../views/teacher/moderation_review.php';
     }

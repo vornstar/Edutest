@@ -7,13 +7,19 @@
 /** @var array|null $selfTestSubmission */
 /** @var array $groups */
 /** @var array|null $paperGroup */
+/** @var array $ownBoundaries this paper's own grade boundary bands, highest first (ignores borrowing) */
+/** @var array|null $boundarySourcePaper the paper this one currently borrows boundaries from, if any */
+/** @var array $boundaryCandidates same-group papers with their own boundaries, offered for borrowing */
 $__title = htmlspecialchars($paper['title']);
 require __DIR__ . '/../partials/header.php';
+require_once __DIR__ . '/../../models/GradeBoundary.php';
 
 /** Trims a trailing ".00"/".50" etc. down to whichever is cleanest, e.g. 20.0 -> "20", 12.5 -> "12.5". */
 $formatMarks = static function (float $v): string {
     return rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.');
 };
+
+$resolvedBoundaries = GradeBoundary::resolveForPaper($paper);
 ?>
 <div class="panel">
     <div class="panel-header">
@@ -90,6 +96,56 @@ $formatMarks = static function (float $v): string {
     <?php elseif ($paper['duration_minutes']): ?>
         <p>Duration: <?= (int) $paper['duration_minutes'] ?> minutes</p>
     <?php endif; ?>
+
+    <div class="question-block">
+        <h2 style="margin-top:0">Grade boundaries</h2>
+        <p>Optional. Once set, a resolved grade shows straight away on the marking and moderation screens, and can be released to students (per test window, from Classes &gt; Open test windows) alongside this table.</p>
+
+        <?php if ($resolvedBoundaries): ?>
+            <table class="data-table" style="max-width:20rem;">
+                <thead><tr><th>Grade</th><th>Minimum %</th></tr></thead>
+                <tbody>
+                <?php foreach ($resolvedBoundaries as $band): ?>
+                    <tr><td><?= htmlspecialchars($band['grade_label']) ?></td><td><?= htmlspecialchars((string) $band['min_percent']) ?>%</td></tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php else: ?>
+            <p class="autosave-status">No grade boundaries set for this paper.</p>
+        <?php endif; ?>
+
+        <?php if ($canManage): ?>
+            <?php if ($boundarySourcePaper): ?>
+                <p class="autosave-status">Currently borrowing the table above from <strong><?= htmlspecialchars($boundarySourcePaper['title']) ?></strong> - the boxes below edit this paper's <em>own</em> boundaries, which only take effect once you switch back to "Use this paper's own boundaries" below.</p>
+            <?php endif; ?>
+
+            <form method="post" action="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/grade-boundaries">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
+                <label>This paper's own boundaries <span class="autosave-status">(one per line: grade,minimum % - e.g. "9,90" - saving switches this paper to use these, even if it was borrowing another paper's)</span>
+                    <textarea name="boundaries" rows="6"><?php foreach ($ownBoundaries as $band): ?><?= htmlspecialchars($band['grade_label']) ?>,<?= htmlspecialchars((string) $band['min_percent']) ?>
+<?php endforeach; ?></textarea>
+                </label>
+                <button type="submit" class="btn">Save own boundaries</button>
+            </form>
+
+            <?php if ($boundaryCandidates): ?>
+                <form method="post" action="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/grade-boundaries/source" style="display:flex;gap:0.5rem;align-items:flex-end;">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
+                    <label>Or borrow boundaries from another paper in this group
+                        <select name="source_paper_id">
+                            <option value="">&mdash; use this paper's own boundaries &mdash;</option>
+                            <?php foreach ($boundaryCandidates as $c): ?>
+                                <option value="<?= (int) $c['id'] ?>" <?= $boundarySourcePaper && (int) $boundarySourcePaper['id'] === (int) $c['id'] ? 'selected' : '' ?>><?= htmlspecialchars($c['title']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </label>
+                    <button type="submit" class="btn">Save</button>
+                </form>
+            <?php elseif (!$paper['group_id']): ?>
+                <p class="autosave-status">Put this paper in a group (see above) to borrow grade boundaries from another paper in it.</p>
+            <?php endif; ?>
+        <?php endif; ?>
+    </div>
 
     <div class="question-block">
         <h2 style="margin-top:0">Test this paper before assigning it</h2>

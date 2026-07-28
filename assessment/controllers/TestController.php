@@ -298,6 +298,40 @@ final class TestController
         exit;
     }
 
+    /** Releases every student's resolved grade (see GradeBoundary) on this assignment - shown on their own submission page from then on, alongside the boundary table it came from. */
+    public static function releaseGrades(int $assignmentId): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        AuthController::verifyCsrf();
+        $assignment = TestAssignment::find($assignmentId);
+        if (!$assignment) {
+            http_response_code(404);
+            exit;
+        }
+        PaperController::requireManageable((int) $assignment['paper_id'], $user);
+
+        TestAssignment::releaseGrades($assignmentId);
+        header('Location: /assessment/teacher/open-tests');
+        exit;
+    }
+
+    /** Undoes releaseGrades() - hides the grade from students again (e.g. to fix a mismarked boundary before anyone sees it). */
+    public static function unreleaseGrades(int $assignmentId): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        AuthController::verifyCsrf();
+        $assignment = TestAssignment::find($assignmentId);
+        if (!$assignment) {
+            http_response_code(404);
+            exit;
+        }
+        PaperController::requireManageable((int) $assignment['paper_id'], $user);
+
+        TestAssignment::unreleaseGrades($assignmentId);
+        header('Location: /assessment/teacher/open-tests');
+        exit;
+    }
+
     /**
      * Flips self-marking on/off for an already-assigned test - lets a
      * teacher hold it off while the class is still sitting the test, then

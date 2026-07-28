@@ -33,7 +33,7 @@ $statusLabels = [
     <?php endif; ?>
 
     <table class="data-table">
-        <thead><tr><th>Paper</th><th>Assigned by</th><th>Class</th><th>Student</th><th>Status</th><th>Score</th></tr></thead>
+        <thead><tr><th>Paper</th><th>Assigned by</th><th>Class</th><th>Student</th><th>Status</th><th>Score</th><th>Grade</th></tr></thead>
         <tbody>
         <?php foreach ($rows as $row): ?>
             <tr>
@@ -43,10 +43,11 @@ $statusLabels = [
                 <td><?= htmlspecialchars($row['student_name']) ?></td>
                 <td><?= htmlspecialchars($statusLabels[$row['status']] ?? $row['status']) ?></td>
                 <td><?= $row['score'] !== null ? htmlspecialchars((string) $row['score']) . ' / ' . htmlspecialchars((string) $row['max']) : '—' ?></td>
+                <td><?= htmlspecialchars($row['grade'] ?? '—') ?></td>
             </tr>
         <?php endforeach; ?>
         <?php if (!$rows): ?>
-            <tr><td colspan="6">No submissions yet.</td></tr>
+            <tr><td colspan="7">No submissions yet.</td></tr>
         <?php endif; ?>
         </tbody>
     </table>

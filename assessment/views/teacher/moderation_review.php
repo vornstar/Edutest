@@ -9,6 +9,7 @@
 /** @var array $markSchemes */
 /** @var array $annotations */
 /** @var array $customStamps each: ['id' => int, 'label' => string] */
+/** @var string|null $currentGrade live-preview grade from your own moderation marks saved so far, or null if this paper has no grade boundaries (or no max marks set) */
 $__title = 'Moderation review';
 require __DIR__ . '/../partials/header.php';
 
@@ -57,6 +58,9 @@ $hasTypedAnswers = $paper['type'] === 'digital' && empty($submission['scan_drive
         <?php endif; ?>
 
         <div class="mark-pane">
+            <?php if ($currentGrade !== null): ?>
+                <p class="autosave-status"><strong>Current grade: <?= htmlspecialchars($currentGrade) ?></strong> (from your own moderation marks saved so far)</p>
+            <?php endif; ?>
             <form method="post" action="/assessment/teacher/moderation/review/<?= (int) $moderation['id'] ?>">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
 

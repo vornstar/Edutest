@@ -9,6 +9,7 @@ require_once __DIR__ . '/../models/TestAssignment.php';
 require_once __DIR__ . '/../models/Submission.php';
 require_once __DIR__ . '/../models/Mark.php';
 require_once __DIR__ . '/../models/Question.php';
+require_once __DIR__ . '/../models/GradeBoundary.php';
 
 /**
  * Read-only aggregated reporting for the "Data" role (SRS 3.2). Every query
@@ -74,13 +75,15 @@ final class DataController
         $rows = [];
         foreach ($papers as $paper) {
             $questions = Question::forPaper((int) $paper['id']);
-            $maxTotal = $questions ? array_sum(array_column($questions, 'max_marks')) : (float) ($paper['max_marks'] ?? 0);
+            $maxTotal = Paper::maxMarksFor($paper, $questions);
+            $boundaries = GradeBoundary::resolveForPaper($paper);
             $owner = User::find((int) $paper['created_by']);
 
             foreach (TestAssignment::forPaper((int) $paper['id']) as $assignment) {
                 $classes[(int) $assignment['class_id']] = $assignment['class_name'];
                 foreach (Submission::forAssignment((int) $assignment['id']) as $submission) {
                     $isMarked = in_array($submission['status'], ['marked', 'moderated'], true);
+                    $score = $isMarked ? Mark::totalScore((int) $submission['id'], 'primary') : null;
                     $rows[] = [
                         'paper_id' => $paper['id'],
                         'paper_title' => $paper['title'],
@@ -89,8 +92,11 @@ final class DataController
                         'class_name' => $assignment['class_name'],
                         'student_name' => $submission['student_name'],
                         'status' => $submission['status'],
-                        'score' => $isMarked ? Mark::totalScore((int) $submission['id'], 'primary') : null,
+                        'score' => $score,
                         'max' => $maxTotal,
+                        'grade' => ($score !== null && $boundaries && $maxTotal > 0)
+                            ? GradeBoundary::gradeForPercent($boundaries, $score / $maxTotal * 100)
+                            : null,
                     ];
                 }
             }

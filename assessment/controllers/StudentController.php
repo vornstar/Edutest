@@ -7,6 +7,7 @@ require_once __DIR__ . '/../models/User.php';
 require_once __DIR__ . '/../models/TestAssignment.php';
 require_once __DIR__ . '/../models/Submission.php';
 require_once __DIR__ . '/../models/Mark.php';
+require_once __DIR__ . '/../models/GradeBoundary.php';
 require_once __DIR__ . '/../models/Paper.php';
 require_once __DIR__ . '/../models/Question.php';
 require_once __DIR__ . '/../models/Annotation.php';
@@ -63,6 +64,20 @@ final class StudentController
         $showFinalMarks = in_array($submission['status'], ['marked', 'moderated'], true);
         $finalMarks = $showFinalMarks ? Mark::latestForSubmission($submissionId, 'primary') : [];
         $annotations = $showFinalMarks ? Annotation::forSubmission($submissionId) : [];
+
+        // Only ever shown once the teacher has explicitly released grades for THIS
+        // assignment (see TestController::releaseGrades) - never just because marking
+        // is done, and never a raw fetch a student could reach some other way.
+        $gradesReleased = $showFinalMarks && !empty($assignment['grade_released_at']);
+        $releasedGrade = null;
+        $releasedBoundaries = [];
+        if ($gradesReleased) {
+            $releasedBoundaries = GradeBoundary::resolveForPaper($paper);
+            $maxMarksTotal = Paper::maxMarksFor($paper, $questions);
+            if ($releasedBoundaries && $maxMarksTotal > 0) {
+                $releasedGrade = GradeBoundary::gradeForPercent($releasedBoundaries, Mark::totalScore($submissionId, 'primary') / $maxMarksTotal * 100);
+            }
+        }
 
         require __DIR__ . '/../views/student/submission_summary.php';
     }

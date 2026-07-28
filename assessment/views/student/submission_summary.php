@@ -8,6 +8,9 @@
 /** @var bool $showFinalMarks */
 /** @var array $finalMarks */
 /** @var array $annotations */
+/** @var bool $gradesReleased */
+/** @var string|null $releasedGrade */
+/** @var array $releasedBoundaries highest grade first */
 $__title = 'Submission summary';
 require __DIR__ . '/../partials/header.php';
 
@@ -19,6 +22,23 @@ $hasScanOrPdf = $paper['type'] === 'pdf' || !empty($submission['scan_drive_item_
 
     <?php if ($submission['status'] === 'submitted' && !empty($assignment['self_marking_enabled'])): ?>
         <a class="btn btn-primary" href="/assessment/student/submissions/<?= (int) $submission['id'] ?>/self-mark">Start self-marking</a>
+    <?php endif; ?>
+
+    <?php if ($gradesReleased): ?>
+        <p>Your grade: <strong><?= htmlspecialchars($releasedGrade ?? 'Below the lowest grade boundary') ?></strong></p>
+        <?php if ($releasedBoundaries): ?>
+            <table class="data-table" style="max-width:20rem;">
+                <thead><tr><th>Grade</th><th>Minimum %</th></tr></thead>
+                <tbody>
+                <?php foreach ($releasedBoundaries as $band): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($band['grade_label']) ?></td>
+                        <td><?= htmlspecialchars((string) $band['min_percent']) ?>%</td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php endif; ?>
     <?php endif; ?>
 
     <?php if ($showFinalMarks && $questions): ?>

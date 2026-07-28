@@ -96,6 +96,8 @@ $routes = [
     ['POST', '/teacher/papers/{id}/publish', [PaperController::class, 'publish']],
     ['POST', '/teacher/papers/{id}/max-marks', [PaperController::class, 'updateMaxMarks']],
     ['POST', '/teacher/papers/{id}/duration', [PaperController::class, 'updateDuration']],
+    ['POST', '/teacher/papers/{id}/grade-boundaries', [PaperController::class, 'updateGradeBoundaries']],
+    ['POST', '/teacher/papers/{id}/grade-boundaries/source', [PaperController::class, 'updateGradeBoundarySource']],
     ['POST', '/teacher/papers/{id}/group', [PaperController::class, 'updateGroup']],
     ['POST', '/teacher/papers/{id}/update-pdf', [PaperController::class, 'updatePdf']],
     ['POST', '/teacher/papers/{id}/delete', [PaperController::class, 'destroy']],
@@ -111,6 +113,8 @@ $routes = [
     ['POST', '/teacher/assignments/{id}/reopen', [TestController::class, 'reopenTest']],
     ['POST', '/teacher/assignments/{id}/cancel', [TestController::class, 'cancelTest']],
     ['POST', '/teacher/assignments/{id}/restore', [TestController::class, 'restoreTest']],
+    ['POST', '/teacher/assignments/{id}/release-grades', [TestController::class, 'releaseGrades']],
+    ['POST', '/teacher/assignments/{id}/unrelease-grades', [TestController::class, 'unreleaseGrades']],
     ['GET', '/teacher/papers/{id}/results', [PaperController::class, 'results']],
 
     ['GET', '/teacher/assignments/{id}/upload-scan', [ScanUploadController::class, 'form']],

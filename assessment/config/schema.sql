@@ -100,10 +100,28 @@ CREATE TABLE IF NOT EXISTS papers (
     max_marks                DECIMAL(6,2) NULL COMMENT 'For pdf-type papers with no per-question breakdown - a single overall mark out of this, also pushed as the Teams assignment''s points value',
     duration_minutes         INT UNSIGNED NULL,
     status                   ENUM('draft','published','archived') NOT NULL DEFAULT 'draft',
+    grade_boundary_source_paper_id INT UNSIGNED NULL COMMENT 'If set, use THAT paper''s own grade_boundaries rows instead of this paper''s own (see GradeBoundary::resolveForPaper) - must point at a paper with boundaries directly defined, not itself borrowing (Paper::forGroupWithOwnBoundaries only offers such papers, keeping resolution to one hop). NULL = use this paper''s own boundaries if it has any, else no grade boundaries at all.',
     created_at               DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at               DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_papers_creator FOREIGN KEY (created_by) REFERENCES users(id),
-    CONSTRAINT fk_papers_group FOREIGN KEY (group_id) REFERENCES paper_groups(id) ON DELETE SET NULL
+    CONSTRAINT fk_papers_group FOREIGN KEY (group_id) REFERENCES paper_groups(id) ON DELETE SET NULL,
+    CONSTRAINT fk_papers_grade_boundary_source FOREIGN KEY (grade_boundary_source_paper_id) REFERENCES papers(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- A paper's own grade boundary bands (e.g. "9" >= 90%, "8" >= 80%, ...) -
+-- percentage of that paper's own max marks, not a raw score, so a set of
+-- boundaries stays meaningful even when another paper borrows it (see
+-- papers.grade_boundary_source_paper_id) despite having a different total.
+-- Optional: a paper with no rows here (and no borrow link) simply has no
+-- grade boundaries - nothing else is blocked by that.
+CREATE TABLE IF NOT EXISTS grade_boundaries (
+    id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    paper_id    INT UNSIGNED NOT NULL,
+    grade_label VARCHAR(10) NOT NULL COMMENT 'e.g. "9", "A*", "Distinction"',
+    min_percent DECIMAL(5,2) NOT NULL COMMENT 'Minimum percentage of max marks (0-100) to achieve this grade',
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_paper (paper_id),
+    CONSTRAINT fk_grade_boundaries_paper FOREIGN KEY (paper_id) REFERENCES papers(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS questions (
@@ -135,6 +153,7 @@ CREATE TABLE IF NOT EXISTS test_assignments (
     self_marking_enabled TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'Set at assign-time or toggled afterward (see TestAssignment::setSelfMarking) - per-assignment, not per-paper, so a teacher can withhold it until everyone has finished',
     closed_at           DATETIME NULL COMMENT 'NULL = open (accepting student work). Set/cleared via TestAssignment::close()/reopen() - lets a teacher end a test window early or reopen it, independent of due_at.',
     cancelled_at        DATETIME NULL COMMENT 'NULL = active. Set/cleared via TestAssignment::cancel()/restore() - a soft delete: hides the assignment from the student entirely and removes it from Teams if it was pushed there, but nothing (submissions, marks, annotations) is ever actually deleted.',
+    grade_released_at   DATETIME NULL COMMENT 'NULL = not released. Set/cleared via TestAssignment::releaseGrades()/unreleaseGrades() - once set, every student on this assignment can see their own resolved grade (see GradeBoundary) and the boundary table it came from, on their submission page.',
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_assign_paper FOREIGN KEY (paper_id) REFERENCES papers(id) ON DELETE CASCADE,
     CONSTRAINT fk_assign_class FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE SET NULL,

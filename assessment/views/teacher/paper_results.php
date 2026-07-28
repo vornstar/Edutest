@@ -1,6 +1,6 @@
 <?php
 /** @var array $paper */
-/** @var array $rows each: ['submission' => array, 'class_id' => int, 'class_name' => string, 'score' => float|null] */
+/** @var array $rows each: ['submission' => array, 'class_id' => int, 'class_name' => string, 'score' => float|null, 'grade' => string|null] */
 /** @var float $maxTotal */
 /** @var array $classes [class_id => class_name] every class this paper is assigned to */
 /** @var int|null $classFilter */
@@ -35,7 +35,7 @@ $statusLabels = [
     <?php endif; ?>
 
     <table class="data-table">
-        <thead><tr><th>Class</th><th>Student</th><th>Status</th><th>Score</th><th></th></tr></thead>
+        <thead><tr><th>Class</th><th>Student</th><th>Status</th><th>Score</th><th>Grade</th><th></th></tr></thead>
         <tbody>
         <?php foreach ($rows as $row): $s = $row['submission']; ?>
             <tr>
@@ -43,6 +43,7 @@ $statusLabels = [
                 <td><?= htmlspecialchars($s['student_name']) ?></td>
                 <td><?= htmlspecialchars($statusLabels[$s['status']] ?? $s['status']) ?></td>
                 <td><?= $row['score'] !== null ? htmlspecialchars((string) $row['score']) . ' / ' . htmlspecialchars((string) $maxTotal) : '—' ?></td>
+                <td><?= htmlspecialchars($row['grade'] ?? '—') ?></td>
                 <td>
                     <a class="btn" href="/assessment/teacher/marking/<?= (int) $s['id'] ?>"><?= $row['score'] !== null ? 'View/edit marks' : 'Mark' ?></a>
                     <a class="btn" href="/assessment/student/submissions/<?= (int) $s['id'] ?>" title="See exactly what this student sees - their marks, comments, and annotated script">View as student</a>
@@ -50,7 +51,7 @@ $statusLabels = [
             </tr>
         <?php endforeach; ?>
         <?php if (!$rows): ?>
-            <tr><td colspan="5">No submissions yet.</td></tr>
+            <tr><td colspan="6">No submissions yet.</td></tr>
         <?php endif; ?>
         </tbody>
     </table>

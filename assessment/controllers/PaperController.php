@@ -8,6 +8,7 @@ require_once __DIR__ . '/../models/User.php';
 require_once __DIR__ . '/../models/TestAssignment.php';
 require_once __DIR__ . '/../models/Submission.php';
 require_once __DIR__ . '/../models/Mark.php';
+require_once __DIR__ . '/../models/GradeBoundary.php';
 require_once __DIR__ . '/../services/OneDriveService.php';
 
 /**
@@ -319,6 +320,11 @@ final class PaperController
         require_once __DIR__ . '/../models/PaperGroup.php';
         $groups = PaperGroup::all();
         $paperGroup = $paper['group_id'] ? PaperGroup::find((int) $paper['group_id']) : null;
+
+        $ownBoundaries = GradeBoundary::forPaper($paperId);
+        $boundarySourcePaper = $paper['grade_boundary_source_paper_id'] ? Paper::find((int) $paper['grade_boundary_source_paper_id']) : null;
+        $boundaryCandidates = Paper::forGroupWithOwnBoundaries($paper['group_id'] ? (int) $paper['group_id'] : null, $paperId);
+
         require __DIR__ . '/../views/teacher/paper_show.php';
     }
 
@@ -335,7 +341,8 @@ final class PaperController
         $paper = self::requireViewable($paperId, $user);
 
         $questions = Question::forPaper($paperId);
-        $maxTotal = $questions ? array_sum(array_column($questions, 'max_marks')) : (float) ($paper['max_marks'] ?? 0);
+        $maxTotal = Paper::maxMarksFor($paper, $questions);
+        $boundaries = GradeBoundary::resolveForPaper($paper);
 
         $assignments = TestAssignment::forPaper($paperId);
         $classes = [];
@@ -352,16 +359,81 @@ final class PaperController
             }
             foreach (Submission::forAssignment((int) $assignment['id']) as $submission) {
                 $isMarked = in_array($submission['status'], ['marked', 'moderated'], true);
+                $score = $isMarked ? Mark::totalScore((int) $submission['id'], 'primary') : null;
                 $rows[] = [
                     'submission' => $submission,
                     'class_id' => (int) $assignment['class_id'],
                     'class_name' => $assignment['class_name'],
-                    'score' => $isMarked ? Mark::totalScore((int) $submission['id'], 'primary') : null,
+                    'score' => $score,
+                    'grade' => ($score !== null && $boundaries && $maxTotal > 0)
+                        ? GradeBoundary::gradeForPercent($boundaries, $score / $maxTotal * 100)
+                        : null,
                 ];
             }
         }
 
         require __DIR__ . '/../views/teacher/paper_results.php';
+    }
+
+    /** Sets this paper's OWN grade boundary bands (see GradeBoundary::forPaper) - always clears any "borrow from another paper" link, since defining your own explicitly means "use mine, not theirs." Anyone currently borrowing THIS paper's boundaries is unaffected either way. */
+    public static function updateGradeBoundaries(int $paperId): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        AuthController::verifyCsrf();
+        self::requireManageable($paperId, $user);
+
+        $bands = [];
+        foreach (explode("\n", (string) ($_POST['boundaries'] ?? '')) as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+            $parts = array_map('trim', explode(',', $line, 2));
+            if (count($parts) !== 2 || $parts[0] === '' || !is_numeric($parts[1])) {
+                continue;
+            }
+            $bands[] = ['grade_label' => $parts[0], 'min_percent' => (float) $parts[1]];
+        }
+        usort($bands, static fn(array $a, array $b): int => $b['min_percent'] <=> $a['min_percent']);
+
+        GradeBoundary::replaceForPaper($paperId, $bands);
+        Paper::setGradeBoundarySource($paperId, null);
+
+        header('Location: /assessment/teacher/papers/' . $paperId);
+        exit;
+    }
+
+    /**
+     * Points this paper at another paper's grade boundaries instead of its
+     * own - see Paper::forGroupWithOwnBoundaries for what's offered (same
+     * group, own boundaries directly defined, not itself borrowing).
+     * Choosing "none" clears it, reverting to this paper's own bands, if
+     * it has any (they're never deleted just by borrowing - see
+     * updateGradeBoundaries()).
+     */
+    public static function updateGradeBoundarySource(int $paperId): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        AuthController::verifyCsrf();
+        $paper = self::requireManageable($paperId, $user);
+
+        $sourceId = !empty($_POST['source_paper_id']) ? (int) $_POST['source_paper_id'] : null;
+        if ($sourceId !== null) {
+            $candidateIds = array_map('intval', array_column(
+                Paper::forGroupWithOwnBoundaries($paper['group_id'] ? (int) $paper['group_id'] : null, $paperId),
+                'id'
+            ));
+            if (!in_array($sourceId, $candidateIds, true)) {
+                http_response_code(422);
+                echo 'Not a valid paper to borrow grade boundaries from.';
+                exit;
+            }
+        }
+
+        Paper::setGradeBoundarySource($paperId, $sourceId);
+
+        header('Location: /assessment/teacher/papers/' . $paperId);
+        exit;
     }
 
     public static function addQuestion(int $paperId): void

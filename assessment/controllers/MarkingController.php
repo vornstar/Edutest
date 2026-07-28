@@ -8,6 +8,7 @@ require_once __DIR__ . '/../models/TestAssignment.php';
 require_once __DIR__ . '/../models/Paper.php';
 require_once __DIR__ . '/../models/Question.php';
 require_once __DIR__ . '/../models/Mark.php';
+require_once __DIR__ . '/../models/GradeBoundary.php';
 require_once __DIR__ . '/../models/Annotation.php';
 require_once __DIR__ . '/../models/User.php';
 require_once __DIR__ . '/../models/ClassRoster.php';
@@ -133,6 +134,14 @@ final class MarkingController
         foreach ($questions as $q) {
             $markSchemes[(int) $q['id']] = Question::decryptedMarkScheme($q);
         }
+
+        // Live, best-effort preview of the resolved grade from whatever's currently
+        // saved - updates each time marks are saved, same idea as a running total.
+        $maxMarksTotal = Paper::maxMarksFor($paper, $questions);
+        $boundaries = GradeBoundary::resolveForPaper($paper);
+        $currentGrade = ($boundaries && $maxMarksTotal > 0)
+            ? GradeBoundary::gradeForPercent($boundaries, Mark::totalScore($submissionId, 'primary') / $maxMarksTotal * 100)
+            : null;
 
         require __DIR__ . '/../views/teacher/mark_submission.php';
     }
