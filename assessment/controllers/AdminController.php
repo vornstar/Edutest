@@ -6,6 +6,7 @@ require_once __DIR__ . '/../models/User.php';
 require_once __DIR__ . '/../models/AuditLog.php';
 require_once __DIR__ . '/../models/Subject.php';
 require_once __DIR__ . '/../models/Branding.php';
+require_once __DIR__ . '/../models/DataProtection.php';
 require_once __DIR__ . '/../services/OneDriveService.php';
 
 /**
@@ -255,5 +256,100 @@ final class AdminController
     {
         $value = trim($value);
         return preg_match('/^#[0-9a-fA-F]{6}$/', $value) ? strtolower($value) : null;
+    }
+
+    /**
+     * Admin > Data protection: a subject access export for one user, a way
+     * to anonymize one (erasure), and a way to bulk-delete submissions
+     * older than a chosen date (storage limitation). See DataProtection
+     * for what each of these actually does and why - this controller is
+     * just the search/preview/confirmation UI in front of it.
+     */
+    public static function dataProtection(): void
+    {
+        AuthController::requireRole([User::ROLE_ADMIN]);
+
+        $query = trim((string) ($_GET['q'] ?? ''));
+        $users = [];
+        if ($query !== '') {
+            $needle = mb_strtolower($query);
+            $users = array_values(array_filter(
+                User::all(5000),
+                static fn(array $u): bool => str_contains(mb_strtolower($u['display_name']), $needle) || str_contains(mb_strtolower($u['email']), $needle)
+            ));
+        }
+
+        $previewCutoff = trim((string) ($_GET['preview_before'] ?? ''));
+        $retentionPreview = null;
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $previewCutoff)) {
+            $retentionPreview = DataProtection::submissionsOlderThan($previewCutoff);
+        }
+
+        require __DIR__ . '/../views/admin/data_protection.php';
+    }
+
+    /** Downloads one user's full subject access export as JSON - see DataProtection::exportUser. */
+    public static function exportUserData(int $userId): void
+    {
+        AuthController::requireRole([User::ROLE_ADMIN]);
+
+        try {
+            $export = DataProtection::exportUser($userId);
+        } catch (InvalidArgumentException $e) {
+            http_response_code(404);
+            exit;
+        }
+
+        $filename = 'user-' . $userId . '-data-export-' . date('Y-m-d') . '.json';
+        header('Content-Type: application/json');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        echo json_encode($export, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    /** Anonymizes one user (see DataProtection::anonymizeUser) - gated by typing their current display name exactly, since this can't be undone. */
+    public static function anonymizeUser(int $userId): void
+    {
+        $admin = AuthController::requireRole([User::ROLE_ADMIN]);
+        AuthController::verifyCsrf();
+
+        $user = User::find($userId);
+        if (!$user) {
+            http_response_code(404);
+            exit;
+        }
+
+        $typed = trim((string) ($_POST['confirm_name'] ?? ''));
+        if ($typed === '' || $typed !== $user['display_name']) {
+            http_response_code(422);
+            echo 'Confirmation text did not match this user\'s current display name exactly - nothing was changed.';
+            exit;
+        }
+
+        DataProtection::anonymizeUser($userId, (int) $admin['id']);
+
+        header('Location: /assessment/admin/data-protection?anonymized=' . $userId);
+        exit;
+    }
+
+    /** Bulk-deletes submissions older than a chosen date (see DataProtection::deleteSubmissionsOlderThan) - gated by typing DELETE exactly, since this is genuinely irreversible, unlike everything else this app deletes. */
+    public static function deleteOldData(): void
+    {
+        $admin = AuthController::requireRole([User::ROLE_ADMIN]);
+        AuthController::verifyCsrf();
+
+        $cutoffDate = trim((string) ($_POST['cutoff_date'] ?? ''));
+        $confirmText = trim((string) ($_POST['confirm_text'] ?? ''));
+
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $cutoffDate) || strtoupper($confirmText) !== 'DELETE') {
+            http_response_code(422);
+            echo 'Confirmation failed - a valid cutoff date and typing DELETE exactly are both required. Nothing was changed.';
+            exit;
+        }
+
+        $deleted = DataProtection::deleteSubmissionsOlderThan($cutoffDate, (int) $admin['id'], (int) $admin['id']);
+
+        header('Location: /assessment/admin/data-protection?deleted=' . $deleted);
+        exit;
     }
 }

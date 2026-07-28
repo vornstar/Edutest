@@ -242,6 +242,12 @@ final class OneDriveService
     /** Discards an unwanted Inbox upload outright (not a soft delete - it was never attached to anything, so there's nothing to preserve). */
     public function deleteInboxItem(string $driveItemId): void
     {
+        $this->deleteItem($driveItemId);
+    }
+
+    /** Deletes any item in the shared drive by id outright - e.g. a scanned script whose submission is being purged under a data-retention policy (see DataProtection::deleteSubmissionsOlderThan). Not a soft delete; there is no "undo" on the OneDrive side once this returns. */
+    public function deleteItem(string $driveItemId): void
+    {
         $root = $this->resolveMasterFolder();
         $this->graph->delete("/drives/{$root['driveId']}/items/{$driveItemId}");
     }
