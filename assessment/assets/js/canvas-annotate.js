@@ -90,6 +90,29 @@
     document.addEventListener('visibilitychange', forceRepaint);
     window.addEventListener('pageshow', forceRepaint);
 
+    // True only while loadOwnAnnotation() below is replaying a page's saved
+    // JSON back onto the canvas via loadFromJSON() - object:added/removed
+    // fire once per restored object, and none of that is a real change to
+    // save back out again.
+    var isRestoringAnnotations = false;
+    // Saves the current page a moment after anything actually changes on it
+    // (a stamp placed, a stroke drawn, something erased, an object dragged) -
+    // not just on page-turn/manual-save/unload like before. A genuine
+    // trailing-edge debounce (unlike throttle() below, which fires
+    // immediately on the first call in a burst) - the Circle tool adds its
+    // shape on mouse:down at size zero and only resizes it on mouse:up, so
+    // an immediate leading-edge save could persist a degenerate 0x0 circle
+    // if it happened to be the first change on a freshly-loaded page.
+    // Waiting out the full quiet period every time avoids that race, and
+    // still coalesces a burst of quick actions into a single save.
+    var autosaveTimer = null;
+    function debouncedAutosave() {
+        clearTimeout(autosaveTimer);
+        autosaveTimer = setTimeout(function () {
+            if (!isRestoringAnnotations) saveAnnotation(currentPage, true);
+        }, 800);
+    }
+
     function throttle(fn, ms) {
         var last = 0, timer = null;
         return function () {
@@ -184,24 +207,62 @@
     var exportBtn = document.getElementById('export-annotated-pdf');
     if (exportBtn) exportBtn.onclick = exportAnnotatedPdf;
 
-    PdfAnnotateCore.loadDocument(canvasEl.dataset.pdfSrc).then(function (pdfDoc) {
-        loadedPdfDoc = pdfDoc;
-        pagination = PdfAnnotateCore.wirePagination(
-            document.querySelector('.annotation-tools'),
-            pdfDoc.numPages,
-            function (pageNumber) { renderPage(pdfDoc, pageNumber); }
-        );
-        setupPageMarks(pdfDoc.numPages);
-        // Resume on the page the marker was last on (e.g. after a refresh)
-        // rather than always restarting at page 1.
-        var savedPage = parseInt(window.localStorage.getItem(pageStorageKey), 10);
-        var startPage = savedPage >= 1 && savedPage <= pdfDoc.numPages ? savedPage : 1;
-        pagination.setPage(startPage);
-    }).catch(function (err) {
-        console.error('Failed to render PDF for annotation', err);
-    });
+    setupExportStampOverlay();
+    startLoadingPdf();
+
+    /**
+     * PdfAnnotateCore.loadDocument() already retries a couple of times
+     * internally on a transient failure. If it still fails after that (CDN
+     * genuinely unreachable, bad network, etc.), show a visible message with
+     * a retry button instead of leaving a permanently blank script that the
+     * marker can only fix by guessing to refresh the whole page.
+     */
+    function startLoadingPdf() {
+        hidePdfLoadError();
+        PdfAnnotateCore.loadDocument(canvasEl.dataset.pdfSrc).then(function (pdfDoc) {
+            loadedPdfDoc = pdfDoc;
+            pagination = PdfAnnotateCore.wirePagination(
+                document.querySelector('.annotation-tools'),
+                pdfDoc.numPages,
+                function (pageNumber) { renderPage(pdfDoc, pageNumber); }
+            );
+            setupPageMarks(pdfDoc.numPages);
+            // Resume on the page the marker was last on (e.g. after a refresh)
+            // rather than always restarting at page 1.
+            var savedPage = parseInt(window.localStorage.getItem(pageStorageKey), 10);
+            var startPage = savedPage >= 1 && savedPage <= pdfDoc.numPages ? savedPage : 1;
+            pagination.setPage(startPage);
+        }).catch(function (err) {
+            console.error('Failed to render PDF for annotation', err);
+            showPdfLoadError();
+        });
+    }
+
+    var pdfLoadErrorEl = null;
+    function showPdfLoadError() {
+        if (pdfLoadErrorEl) return;
+        pdfLoadErrorEl = document.createElement('p');
+        pdfLoadErrorEl.className = 'autosave-status';
+        pdfLoadErrorEl.textContent = 'Could not load the script - check your connection, then ';
+        var retryBtn = document.createElement('button');
+        retryBtn.type = 'button';
+        retryBtn.className = 'btn';
+        retryBtn.textContent = 'try again';
+        retryBtn.onclick = startLoadingPdf;
+        pdfLoadErrorEl.appendChild(retryBtn);
+        (canvasEl.parentElement || container).insertBefore(pdfLoadErrorEl, canvasEl);
+    }
+    function hidePdfLoadError() {
+        if (!pdfLoadErrorEl) return;
+        pdfLoadErrorEl.remove();
+        pdfLoadErrorEl = null;
+    }
 
     function renderPage(pdfDoc, pageNumber) {
+        // A pending debounced autosave for the outgoing page is about to be
+        // superseded by the explicit save right below - drop it so it
+        // doesn't redundantly fire again once we're already on the next page.
+        clearTimeout(autosaveTimer);
         // Save whatever's on the outgoing page before switching away from it -
         // must pass currentPage explicitly (see its declaration above).
         // Silent: no popup, just the small status text, so paging through a
@@ -217,6 +278,7 @@
         if (studentStaticCanvas) studentStaticCanvas.dispose();
         currentPage = pageNumber;
         if (pageMarksApi) pageMarksApi.highlightCurrentPage(pageNumber);
+        toggleExportStampOverlay(pageNumber === 1);
         placeholderText = null;
         drawingCircle = null;
         circleStartPointer = null;
@@ -231,7 +293,20 @@
             PdfAnnotateCore.fitCanvasToContainer(fabricCanvas, container, rendered.width, rendered.height);
             applyTool(currentTool, currentStampLabel);
             fabricCanvas.on('mouse:down', function (opt) {
-                if (opt.target) return; // clicking an existing object always just selects/edits it
+                if (currentTool === 'delete') {
+                    // Erase tool: clicking directly on a mark removes it, no
+                    // separate select-then-delete step - stays armed for the
+                    // next click, same as the placement tools do. Clicking
+                    // blank space does nothing.
+                    if (opt.target) {
+                        if (opt.target === placeholderText) placeholderText = null;
+                        fabricCanvas.remove(opt.target);
+                        fabricCanvas.discardActiveObject();
+                        fabricCanvas.requestRenderAll();
+                    }
+                    return;
+                }
+                if (opt.target) return; // clicking an existing object always just selects/edits it - also how the Select tool works, with no special-casing of its own
                 if (currentTool === 'text') {
                     // Stays armed after placing one text box, so the next
                     // click starts another without re-clicking "Text".
@@ -310,19 +385,23 @@
                 circleStartPointer = null;
             });
             fabricCanvas.on('text:editing:exited', function (opt) {
-                // Clicking away without typing anything leaves an empty/
-                // still-placeholder box behind - remove it. Unlike the other
-                // discardPlaceholder() call sites, nothing else is about to
-                // save here, so trigger it explicitly.
                 if (opt.target === placeholderText && discardPlaceholder()) {
-                    saveAnnotation(currentPage, true);
+                    // Removing it fires object:removed below, which already
+                    // debounce-saves - no need to trigger it a second time.
+                    return;
                 }
+                // Finished typing a real comment - save now rather than
+                // waiting for a page turn or the manual Save button.
+                debouncedAutosave();
             });
-            // Keeps the "N ticks on this page" hint (see setupPageMarks()) live as
-            // stamps are placed/removed/dragged off - a no-op when pageMarksApi is
-            // null (per-question papers have no marks-per-page list to refresh).
-            fabricCanvas.on('object:added', refreshTickHintsForCurrentPage);
-            fabricCanvas.on('object:removed', refreshTickHintsForCurrentPage);
+            // Keeps the "N ticks on this page" hint (see setupPageMarks()) live, and
+            // autosaves shortly after any real change - a stamp placed, a stroke
+            // drawn, something erased, an object dragged/resized. Both are no-ops
+            // while isRestoringAnnotations is true (loadOwnAnnotation() below is
+            // just replaying already-saved content, not a new change to save).
+            fabricCanvas.on('object:added', handleCanvasObjectChange);
+            fabricCanvas.on('object:removed', handleCanvasObjectChange);
+            fabricCanvas.on('object:modified', handleCanvasObjectChange);
 
             wireTools();
 
@@ -377,7 +456,7 @@
         currentTool = tool;
         if (tool === 'stamp') currentStampLabel = stampLabel;
         if (!fabricCanvas) return;
-        canvasEl.style.cursor = (tool === 'text' || tool === 'stamp' || tool === 'circle') ? 'crosshair' : '';
+        canvasEl.style.cursor = (tool === 'text' || tool === 'stamp' || tool === 'circle' || tool === 'delete') ? 'crosshair' : '';
         if (tool === 'pen') {
             fabricCanvas.isDrawingMode = true;
             fabricCanvas.freeDrawingBrush.width = 3;
@@ -387,7 +466,7 @@
             fabricCanvas.freeDrawingBrush.width = 16;
             fabricCanvas.freeDrawingBrush.color = hexToRgba(currentColor(), 0.35);
         } else {
-            fabricCanvas.isDrawingMode = false; // 'text', 'stamp', and 'circle' (its own drag-to-size handled via mouse:down/move/up, not the free-drawing brush)
+            fabricCanvas.isDrawingMode = false; // 'select', 'text', 'stamp', 'circle' (its own drag-to-size handled via mouse:down/move/up, not the free-drawing brush), and 'delete' (erase-on-click, see mouse:down)
         }
         toolButtons.forEach(function (btn) {
             var isThisStamp = tool === 'stamp' && btn.dataset.tool === 'stamp' && btn.dataset.stamp === stampLabel;
@@ -403,14 +482,11 @@
                 btn.onclick = function () { applyTool('stamp', btn.dataset.stamp); };
                 return;
             }
-            if (tool !== 'pen' && tool !== 'highlighter' && tool !== 'text' && tool !== 'circle' && tool !== 'delete') return;
-            btn.onclick = function () {
-                if (tool === 'delete') {
-                    deleteSelected();
-                } else {
-                    applyTool(tool);
-                }
-            };
+            if (tool !== 'select' && tool !== 'pen' && tool !== 'highlighter' && tool !== 'text' && tool !== 'circle' && tool !== 'delete') return;
+            // 'delete' used to be a one-shot "delete whatever's already selected" button;
+            // it's now an armable erase-on-click tool like the others (see mouse:down) -
+            // Delete/Backspace on a selected object still works too, unchanged, below.
+            btn.onclick = function () { applyTool(tool); };
         });
 
         var colorInput = document.querySelector('[data-tool="color"]');
@@ -462,6 +538,11 @@
 
     function refreshTickHintsForCurrentPage() {
         if (pageMarksApi) pageMarksApi.refreshTickHints();
+    }
+
+    function handleCanvasObjectChange() {
+        refreshTickHintsForCurrentPage();
+        debouncedAutosave();
     }
 
     /**
@@ -569,9 +650,11 @@
     function loadOwnAnnotation(pageNumber, img) {
         var existing = window.__existingAnnotations && window.__existingAnnotations[pageNumber];
         if (existing) {
+            isRestoringAnnotations = true;
             fabricCanvas.loadFromJSON(existing, function () {
                 fabricCanvas.setBackgroundImage(img, function () {
                     fabricCanvas.requestRenderAll();
+                    isRestoringAnnotations = false;
                     refreshTickHintsForCurrentPage();
                 });
             });
@@ -611,6 +694,42 @@
             if (statusEl) statusEl.textContent = 'Save failed - check your connection.';
             if (!silent) alert('Failed to save annotations.');
         });
+    }
+
+    /**
+     * Same student name / mark / marker / moderator info that gets baked
+     * into the exported PDF's first page (see addExportStampToPage() below),
+     * but shown live on screen while marking - not just once printed/saved.
+     * A plain non-interactive HTML overlay (not a Fabric object), so it can
+     * never be accidentally selected, dragged, or saved as part of the
+     * annotation JSON. Populated once (window.__exportStamp doesn't change
+     * without a page reload) - renderPage() just toggles it on for page 1.
+     */
+    function setupExportStampOverlay() {
+        var overlay = document.getElementById('export-stamp-overlay');
+        if (!overlay) return;
+        var meta = window.__exportStamp || {};
+        var topLeft = overlay.querySelector('.export-stamp-topleft');
+        var topRight = overlay.querySelector('.export-stamp-topright');
+
+        if (topLeft) {
+            topLeft.textContent = meta.studentName || '';
+            topLeft.style.display = meta.studentName ? '' : 'none';
+        }
+
+        var rightLines = [];
+        if (meta.mark) rightLines.push('Mark: ' + meta.mark);
+        if (meta.markerSurname) rightLines.push('Marked by: ' + meta.markerSurname);
+        if (meta.moderatorSurname) rightLines.push('Moderated by: ' + meta.moderatorSurname);
+        if (topRight) {
+            topRight.textContent = rightLines.join('\n');
+            topRight.style.display = rightLines.length ? '' : 'none';
+        }
+    }
+
+    function toggleExportStampOverlay(visible) {
+        var overlay = document.getElementById('export-stamp-overlay');
+        if (overlay) overlay.style.display = visible ? '' : 'none';
     }
 
     /** "<student name> - <test title>.pdf", falling back to the submission id if either piece of window.__exportStamp is missing - see exportAnnotatedPdf(). */

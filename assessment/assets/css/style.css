@@ -295,6 +295,25 @@ input[type="file"], select, textarea {
     pointer-events: none;
     border-color: transparent;
 }
+/* Student name / mark / marker / moderator, shown live on page 1 while marking -
+   see setupExportStampOverlay()/toggleExportStampOverlay() in canvas-annotate.js.
+   Same look as the equivalent stamp baked into the "Download annotated PDF" export,
+   so what's on screen matches what gets saved/printed. */
+.export-stamp-overlay { position: absolute; inset: 0; pointer-events: none; }
+.export-stamp-topleft, .export-stamp-topright {
+    position: absolute;
+    top: 8px;
+    max-width: 45%;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.85);
+    color: #000;
+    font-size: 0.85rem;
+    font-weight: 700;
+    white-space: pre-line;
+}
+.export-stamp-topleft { left: 8px; }
+.export-stamp-topright { right: 8px; text-align: right; }
 
 .alert { color: var(--color-danger); font-weight: 600; }
 

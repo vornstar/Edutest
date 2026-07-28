@@ -9,13 +9,20 @@ $__builtInStamps = [
     ['LC', 'LC'],
     ['BOD', 'BOD'],
 ];
-/** Matches the Pen/Highlighter/Text/Circle/Delete buttons rendered above this partial in mark_submission.php/moderation_review.php - kept here too so their shortcuts can be managed from the same dropdown. */
+/**
+ * Matches the Select/Pen/Highlighter/Text/Circle/Erase buttons rendered above this
+ * partial in mark_submission.php/moderation_review.php - kept here too so their
+ * shortcuts can be managed from the same dropdown. 'delete' is the erase tool's
+ * data-tool value - unchanged from when it was labelled "Delete selected", so any
+ * shortcut already set for it keeps working.
+ */
 $__toolShortcutTargets = [
+    ['select', 'Select'],
     ['pen', 'Pen'],
     ['highlighter', 'Highlighter'],
     ['text', 'Text'],
     ['circle', 'Circle'],
-    ['delete', 'Delete selected'],
+    ['delete', 'Erase'],
 ];
 ?>
 <span class="tool-divider" aria-hidden="true"></span>

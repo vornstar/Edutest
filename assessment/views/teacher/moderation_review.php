@@ -48,11 +48,12 @@ $__toolBtn = static function (string $tool, string $label, ?string $baseTitle = 
             <?php endif; ?>
             <div class="annotation-tools">
                 <div class="tool-group">
+                    <?= $__toolBtn('select', 'Select', 'Click or drag to select a mark - useful if Pen/Highlighter keeps drawing over it instead') ?>
                     <?= $__toolBtn('pen', 'Pen') ?>
                     <?= $__toolBtn('highlighter', 'Highlighter') ?>
                     <?= $__toolBtn('text', 'Text') ?>
                     <?= $__toolBtn('circle', 'Circle', 'Drag to circle a mark - or just click for a default-sized circle') ?>
-                    <?= $__toolBtn('delete', 'Delete selected') ?>
+                    <?= $__toolBtn('delete', 'Erase', 'Click any mark to remove it') ?>
                     <input type="color" data-tool="color" value="<?= htmlspecialchars($__branding['teacher_moderation_color'] ?? Branding::DEFAULT_TEACHER_MODERATION_COLOR) ?>">
                 </div>
                 <?php require __DIR__ . '/../partials/stamp_toolbar.php'; ?>
@@ -68,7 +69,7 @@ $__toolBtn = static function (string $tool, string $label, ?string $baseTitle = 
                     <summary title="Save annotations, or download a flattened PDF copy">Actions</summary>
                     <div class="nav-dropdown-menu annotation-actions-menu">
                         <button type="button" id="save-annotation" class="btn">Save annotations</button>
-                        <span class="autosave-status" id="annotation-save-status">Also saves automatically when you change page.</span>
+                        <span class="autosave-status" id="annotation-save-status">Also saves automatically as you mark.</span>
                         <button type="button" id="export-annotated-pdf" class="btn" title="Flattens the script and every annotation layer into one PDF, to save or print">Download annotated PDF</button>
                     </div>
                 </details>
@@ -80,6 +81,10 @@ $__toolBtn = static function (string $tool, string $label, ?string $baseTitle = 
                     <canvas id="annotation-canvas" class="annotation-canvas" data-pdf-src="/assessment/files/papers/<?= (int) $paper['id'] ?>/paper"></canvas>
                 <?php endif; ?>
                 <canvas id="annotation-student-layer" class="annotation-canvas annotation-student-layer"></canvas>
+                <div id="export-stamp-overlay" class="export-stamp-overlay">
+                    <div class="export-stamp-topleft"></div>
+                    <div class="export-stamp-topright"></div>
+                </div>
             </div>
         </div>
         <?php endif; ?>

@@ -37,15 +37,36 @@
                     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/' + PDFJS_VERSION + '/pdf.worker.min.js';
                 resolve(global.pdfjsLib);
             };
-            script.onerror = reject;
+            script.onerror = function (err) {
+                // Don't cache a failed load forever - loadDocument()'s own
+                // retry below should genuinely re-attempt injecting the
+                // script, not just get handed back the same rejection.
+                loadingPromise = null;
+                reject(err);
+            };
             document.head.appendChild(script);
         });
         return loadingPromise;
     }
 
-    function loadDocument(url) {
+    /**
+     * A transient CDN/network hiccup on either the pdf.js library itself or
+     * the PDF file fetch is the most common cause of a script that silently
+     * fails to appear but "fixes itself" on a full page refresh - retrying
+     * here a couple of times does the same thing automatically, instead of
+     * leaving the marker to guess that a refresh might help.
+     */
+    function loadDocument(url, attempt) {
+        attempt = attempt || 1;
         return loadPdfJs().then(function (pdfjsLib) {
             return pdfjsLib.getDocument(url).promise;
+        }).catch(function (err) {
+            if (attempt >= 3) throw err;
+            return new Promise(function (resolve) {
+                setTimeout(resolve, 800 * attempt);
+            }).then(function () {
+                return loadDocument(url, attempt + 1);
+            });
         });
     }
 
