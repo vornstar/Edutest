@@ -64,6 +64,7 @@ $routes = [
     ['POST', '/student/submissions/{id}/submit', [TestController::class, 'submit']],
     ['POST', '/student/submissions/{id}/scan', [TestController::class, 'uploadScan']],
     ['POST', '/student/submissions/{id}/annotation', [TestController::class, 'saveAnnotation']],
+    ['POST', '/student/submissions/{id}/annotation/start-over', [TestController::class, 'startNewAnnotationVersion']],
     ['GET', '/student/submissions/{id}/self-mark', [TestController::class, 'selfMarkForm']],
     ['POST', '/student/submissions/{id}/self-mark', [TestController::class, 'selfMarkSubmit']],
     ['GET', '/student/submissions/{id}', [StudentController::class, 'submissionSummary']],

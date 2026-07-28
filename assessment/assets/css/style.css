@@ -140,11 +140,25 @@ input[type="file"], select, textarea {
    height at that full intrinsic size - it ends up many times taller than
    it should be, pushing (or outright covering, once flex-direction goes
    to column on narrow/mobile screens) everything below it out of view. */
-.annotation-canvas { display: block; max-width: 100%; height: auto; border: 1px solid var(--color-border); border-radius: 6px; }
+.annotation-canvas { display: block; max-width: 100%; height: auto; border: 1px solid var(--color-border); border-radius: 6px; touch-action: none; }
+/* Fabric.js already sets touch-action:none inline on the canvases it creates
+   (so drawing gestures aren't fought over with native scrolling/zooming) -
+   this reinforces it and, more importantly, stops the surrounding page from
+   rubber-band bouncing (which briefly hides/redraws content, i.e. the
+   "page disappears and reappears" - a well-known mobile Safari/Chrome
+   quirk on nested scroll areas) if a touch that starts on the canvas ends
+   up outside it, e.g. a stroke drawn right to the canvas's edge. */
+.pdf-pane, .script-pane, .annotation-stack { overscroll-behavior: contain; }
 .annotation-tools, .pdf-answer-tools { display: flex; gap: 0.5rem; margin-top: 0.5rem; align-items: center; flex-wrap: wrap; }
 .annotation-tools button, .annotation-tools input,
 .pdf-answer-tools button, .pdf-answer-tools input { padding: 0.4rem 0.6rem; }
 .annotation-tools button:disabled, .pdf-answer-tools button:disabled { opacity: 0.5; cursor: not-allowed; }
+.annotation-tools button[data-tool].is-active,
+.pdf-answer-tools button[data-answer-tool].is-active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-primary-contrast);
+}
 
 /* Stacks the read-only "what the student did" layer directly on top of the
    marker's own interactive canvas (which itself has the PDF as its

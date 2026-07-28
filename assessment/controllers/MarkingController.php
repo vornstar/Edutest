@@ -11,6 +11,7 @@ require_once __DIR__ . '/../models/Mark.php';
 require_once __DIR__ . '/../models/Annotation.php';
 require_once __DIR__ . '/../models/User.php';
 require_once __DIR__ . '/../models/ClassRoster.php';
+require_once __DIR__ . '/../models/Moderation.php';
 require_once __DIR__ . '/../services/TeamsService.php';
 
 /**
@@ -51,6 +52,33 @@ final class MarkingController
         return $submission;
     }
 
+    /**
+     * Annotation saving is reached from two different screens sharing the
+     * same JS/endpoint: primary marking (requireMarkable() above) AND
+     * moderation review (moderation_review.php, reusing canvas-annotate.js)
+     * - a secondary marker doing a moderation review very often does NOT
+     * otherwise manage the paper, so they need their own, wider check here
+     * rather than being blocked by requireMarkable()'s stricter one.
+     */
+    private static function requireAnnotatable(int $submissionId, array $user): array
+    {
+        $submission = Submission::find($submissionId);
+        if (!$submission) {
+            http_response_code(404);
+            exit;
+        }
+        if (Moderation::isSecondaryMarker($submissionId, (int) $user['id'])) {
+            return $submission;
+        }
+        $assignment = TestAssignment::find((int) $submission['assignment_id']);
+        $paper = Paper::find((int) $assignment['paper_id']);
+        if (!$paper || !PaperController::canManagePaper($user, $paper)) {
+            http_response_code(404);
+            exit;
+        }
+        return $submission;
+    }
+
     public static function markSubmission(int $submissionId): void
     {
         $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
@@ -65,6 +93,38 @@ final class MarkingController
         $primaryMarks = Mark::latestForSubmission($submissionId, 'primary');
         $annotations = Annotation::forSubmission($submissionId);
         $nextUnmarkedId = Submission::nextUnmarked($submissionId, (int) $paper['id']);
+
+        // The teacher's own marking layer (whatever version of $annotations
+        // belongs to them) is unaffected by the student-version picker below.
+        $teacherAnnotations = [];
+        foreach ($annotations as $a) {
+            if ((int) $a['marker_id'] === (int) $user['id']) {
+                $teacherAnnotations[(int) $a['page_number']] = json_decode($a['data_json'], true);
+            }
+        }
+
+        // The student's own in-PDF writing can have several versions (see
+        // "Start over" - Submission::startNewAnnotationVersion). $annotations
+        // above always carries the latest; ?student_version=N lets the
+        // marker look back at an earlier one instead, defaulting to latest
+        // when absent or invalid.
+        $studentId = (int) $submission['student_id'];
+        $studentVersions = Annotation::versionsForMarker($submissionId, $studentId);
+        $latestStudentVersion = $studentVersions ? (int) end($studentVersions)['version'] : null;
+        $selectedStudentVersion = !empty($_GET['student_version']) ? (int) $_GET['student_version'] : $latestStudentVersion;
+        $viewingOldStudentVersion = $selectedStudentVersion !== null && $selectedStudentVersion !== $latestStudentVersion
+            && in_array($selectedStudentVersion, array_column($studentVersions, 'version'), true);
+        if (!$viewingOldStudentVersion) {
+            $selectedStudentVersion = $latestStudentVersion;
+        }
+
+        $studentRows = $viewingOldStudentVersion
+            ? Annotation::forMarkerVersion($submissionId, $studentId, $selectedStudentVersion)
+            : array_filter($annotations, static fn(array $a): bool => (int) $a['marker_id'] === $studentId);
+        $studentAnnotations = [];
+        foreach ($studentRows as $a) {
+            $studentAnnotations[(int) $a['page_number']] = json_decode($a['data_json'], true);
+        }
 
         // Decrypt mark schemes for display only within this authorized view.
         $markSchemes = [];
@@ -138,7 +198,7 @@ final class MarkingController
     public static function saveAnnotation(int $submissionId): void
     {
         $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
-        self::requireMarkable($submissionId, $user);
+        self::requireAnnotatable($submissionId, $user);
 
         $input = json_decode(file_get_contents('php://input'), true) ?? [];
         AuthController::bootSession();
@@ -148,7 +208,7 @@ final class MarkingController
             exit;
         }
 
-        Annotation::save($submissionId, (int) ($input['page'] ?? 1), (int) $user['id'], (array) ($input['fabric_json'] ?? []));
+        Annotation::save($submissionId, (int) ($input['page'] ?? 1), (int) $user['id'], 1, (array) ($input['fabric_json'] ?? []));
         header('Content-Type: application/json');
         echo json_encode(['saved' => true]);
     }

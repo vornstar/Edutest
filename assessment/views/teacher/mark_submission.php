@@ -7,6 +7,12 @@
 /** @var array $selfMarks */
 /** @var array $primaryMarks */
 /** @var array $annotations */
+/** @var array $teacherAnnotations keyed by page_number, this marker's own layer only */
+/** @var array $studentAnnotations keyed by page_number, the student's layer at $selectedStudentVersion */
+/** @var array $studentVersions each: ['version' => int, 'started_at' => string, 'last_saved_at' => string] */
+/** @var int|null $latestStudentVersion */
+/** @var int|null $selectedStudentVersion */
+/** @var bool $viewingOldStudentVersion */
 /** @var array $markSchemes keyed by question_id */
 /** @var int|null $nextUnmarkedId */
 $__title = 'Marking';
@@ -31,6 +37,25 @@ $hasTypedAnswers = $paper['type'] === 'digital' && empty($submission['scan_drive
                 <?php else: ?>
                     <p class="autosave-status">The student's own typing/writing on the PDF (if any) shows read-only in blue-ish tones on top - your marks go underneath, in whatever colour you pick below.</p>
                 <?php endif; ?>
+
+                <?php if (count($studentVersions) > 1): ?>
+                    <form method="get" action="/assessment/teacher/marking/<?= (int) $submission['id'] ?>" style="max-width:20rem;">
+                        <label>Student's attempt
+                            <select name="student_version" onchange="this.form.submit()">
+                                <?php foreach (array_reverse($studentVersions) as $v): ?>
+                                    <option value="<?= (int) $v['version'] ?>" <?= $selectedStudentVersion === (int) $v['version'] ? 'selected' : '' ?>>
+                                        Version <?= (int) $v['version'] ?><?= (int) $v['version'] === $latestStudentVersion ? ' (latest)' : '' ?> - started <?= htmlspecialchars($v['started_at']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                        <noscript><button type="submit" class="btn">Show</button></noscript>
+                    </form>
+                    <?php if ($viewingOldStudentVersion): ?>
+                        <p class="autosave-status"><strong>Viewing an earlier attempt the student started over from</strong> - your own annotations still apply to their current (latest) attempt.</p>
+                    <?php endif; ?>
+                <?php endif; ?>
+
                 <div class="annotation-tools">
                     <button type="button" data-tool="pen">Pen</button>
                     <button type="button" data-tool="highlighter">Highlighter</button>
@@ -109,24 +134,8 @@ $hasTypedAnswers = $paper['type'] === 'digital' && empty($submission['scan_drive
     </div>
 </div>
 <script>
-window.__existingAnnotations = <?php
-    $byPage = [];
-    foreach ($annotations as $a) {
-        if ((int) $a['marker_id'] === (int) AuthController::currentUser()['id']) {
-            $byPage[(int) $a['page_number']] = json_decode($a['data_json'], true);
-        }
-    }
-    echo json_encode($byPage);
-?>;
-window.__studentAnnotations = <?php
-    $studentByPage = [];
-    foreach ($annotations as $a) {
-        if ((int) $a['marker_id'] === (int) $submission['student_id']) {
-            $studentByPage[(int) $a['page_number']] = json_decode($a['data_json'], true);
-        }
-    }
-    echo json_encode($studentByPage);
-?>;
+window.__existingAnnotations = <?= json_encode($teacherAnnotations) ?>;
+window.__studentAnnotations = <?= json_encode($studentAnnotations) ?>;
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 <script src="<?= asset_url('/assets/js/pdf-annotate-core.js') ?>"></script>

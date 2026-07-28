@@ -68,6 +68,22 @@ final class Submission
         $stmt->execute(['id' => $submissionId]);
     }
 
+    /**
+     * "Start over" on in-PDF writing: bumps the student's active annotation
+     * version so their next autosave starts a fresh, blank version instead
+     * of overwriting the current one - the old version's rows stay in the
+     * DB untouched for a teacher to look back at (see Annotation model).
+     */
+    public static function startNewAnnotationVersion(int $submissionId): int
+    {
+        $pdo = Database::connection();
+        $pdo->prepare('UPDATE submissions SET annotation_version = annotation_version + 1 WHERE id = :id')
+            ->execute(['id' => $submissionId]);
+        $stmt = $pdo->prepare('SELECT annotation_version FROM submissions WHERE id = :id');
+        $stmt->execute(['id' => $submissionId]);
+        return (int) $stmt->fetchColumn();
+    }
+
     public static function attachScan(int $submissionId, string $driveItemId): void
     {
         $stmt = Database::connection()->prepare(

@@ -333,9 +333,39 @@ final class TestController
             exit;
         }
 
-        Annotation::save($submissionId, (int) ($input['page'] ?? 1), (int) $user['id'], (array) ($input['fabric_json'] ?? []));
+        Annotation::save($submissionId, (int) ($input['page'] ?? 1), (int) $user['id'], (int) $submission['annotation_version'], (array) ($input['fabric_json'] ?? []));
         header('Content-Type: application/json');
         echo json_encode(['saved' => true, 'at' => date('c')]);
+    }
+
+    /**
+     * "Start over" on in-PDF writing (SRS: a student can't delete what
+     * they've written, only start a fresh attempt) - bumps
+     * submissions.annotation_version so every subsequent save this page
+     * lands in a new, blank version instead of overwriting the old one.
+     * The old version's rows are untouched, so a teacher can still look
+     * back at it (see MarkingController::markSubmission's version picker).
+     */
+    public static function startNewAnnotationVersion(int $submissionId): void
+    {
+        [, $submission] = self::authorizeSubmissionOwner($submissionId);
+        if ($submission['status'] !== 'in_progress') {
+            http_response_code(409);
+            echo json_encode(['error' => 'Submission already finalized.']);
+            exit;
+        }
+
+        AuthController::bootSession();
+        $input = json_decode(file_get_contents('php://input'), true) ?? [];
+        if (!hash_equals($_SESSION['csrf_token'] ?? '', (string) ($input['csrf_token'] ?? ''))) {
+            http_response_code(419);
+            echo json_encode(['error' => 'Invalid form token.']);
+            exit;
+        }
+
+        $version = Submission::startNewAnnotationVersion($submissionId);
+        header('Content-Type: application/json');
+        echo json_encode(['version' => $version]);
     }
 
     public static function submit(int $submissionId): void

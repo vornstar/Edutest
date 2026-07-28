@@ -13,27 +13,69 @@ require_once __DIR__ . '/Crypto.php';
  */
 final class Annotation
 {
-    public static function save(int $submissionId, int $pageNumber, int $markerId, array $fabricJson): void
+    /** $version: submissions.annotation_version for the student's own layer, always 1 for a teacher/moderator marker (no "start over" concept for them) - see schema.sql. */
+    public static function save(int $submissionId, int $pageNumber, int $markerId, int $version, array $fabricJson): void
     {
         $stmt = Database::connection()->prepare(
-            'INSERT INTO annotations (submission_id, page_number, marker_id, data_cipher)
-             VALUES (:submission_id, :page_number, :marker_id, :data_cipher)
+            'INSERT INTO annotations (submission_id, page_number, marker_id, version, data_cipher)
+             VALUES (:submission_id, :page_number, :marker_id, :version, :data_cipher)
              ON DUPLICATE KEY UPDATE data_cipher = VALUES(data_cipher), updated_at = NOW()'
         );
         $stmt->execute([
             'submission_id' => $submissionId,
             'page_number' => $pageNumber,
             'marker_id' => $markerId,
+            'version' => $version,
             'data_cipher' => Crypto::encrypt(json_encode($fabricJson)),
         ]);
     }
 
-    /** @return array each row's 'data_json' (the Fabric.js JSON string) decrypted transparently */
+    /**
+     * Only the LATEST version of each (page, marker) - the normal "what does
+     * this page look like right now" query used everywhere except the
+     * teacher's version-history picker (see forMarkerVersion() below).
+     * @return array each row's 'data_json' (the Fabric.js JSON string) decrypted transparently
+     */
     public static function forSubmission(int $submissionId): array
     {
-        $stmt = Database::connection()->prepare('SELECT * FROM annotations WHERE submission_id = :submission_id ORDER BY page_number, marker_id');
+        $stmt = Database::connection()->prepare(
+            'SELECT a.* FROM annotations a
+             INNER JOIN (
+                 SELECT page_number, marker_id, MAX(version) AS max_version
+                 FROM annotations WHERE submission_id = :submission_id
+                 GROUP BY page_number, marker_id
+             ) latest ON latest.page_number = a.page_number AND latest.marker_id = a.marker_id AND latest.max_version = a.version
+             WHERE a.submission_id = :submission_id
+             ORDER BY a.page_number, a.marker_id'
+        );
         $stmt->execute(['submission_id' => $submissionId]);
-        $rows = $stmt->fetchAll();
+        return self::decryptAll($stmt->fetchAll());
+    }
+
+    /** Every page of one specific marker+version - used to render a chosen historical version in the teacher's marking view. */
+    public static function forMarkerVersion(int $submissionId, int $markerId, int $version): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT * FROM annotations WHERE submission_id = :submission_id AND marker_id = :marker_id AND version = :version ORDER BY page_number'
+        );
+        $stmt->execute(['submission_id' => $submissionId, 'marker_id' => $markerId, 'version' => $version]);
+        return self::decryptAll($stmt->fetchAll());
+    }
+
+    /** Every version number a marker has ever saved under, oldest first, with when it was started/last touched - powers the teacher's version picker. */
+    public static function versionsForMarker(int $submissionId, int $markerId): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT version, MIN(created_at) AS started_at, MAX(updated_at) AS last_saved_at
+             FROM annotations WHERE submission_id = :submission_id AND marker_id = :marker_id
+             GROUP BY version ORDER BY version'
+        );
+        $stmt->execute(['submission_id' => $submissionId, 'marker_id' => $markerId]);
+        return $stmt->fetchAll();
+    }
+
+    private static function decryptAll(array $rows): array
+    {
         foreach ($rows as &$row) {
             $row['data_json'] = Crypto::decrypt($row['data_cipher']);
             unset($row['data_cipher']);

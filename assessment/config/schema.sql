@@ -129,6 +129,7 @@ CREATE TABLE IF NOT EXISTS submissions (
     student_id          INT UNSIGNED NOT NULL,
     status              ENUM('in_progress','submitted','self_marked','pending_moderation','marked','moderated') NOT NULL DEFAULT 'in_progress',
     scan_drive_item_id  VARCHAR(255) NULL COMMENT 'OneDrive item id for scanned handwritten script',
+    annotation_version  INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'The student''s current in-PDF writing version (see annotations.version) - bumped by "Start over", never decremented, so earlier attempts stay in the DB for a teacher to review',
     started_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     submitted_at        DATETIME NULL,
     UNIQUE KEY uq_assignment_student (assignment_id, student_id),
@@ -179,10 +180,12 @@ CREATE TABLE IF NOT EXISTS annotations (
     submission_id  INT UNSIGNED NOT NULL,
     page_number    INT UNSIGNED NOT NULL DEFAULT 1,
     marker_id      INT UNSIGNED NOT NULL,
+    version        INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'Matches submissions.annotation_version at save time for the student''s own layer (marker_id = student) - always 1 for a teacher/moderator marker, who has no "start over". A page is only ever autosaved in place within one version; a new version starts blank.',
     data_cipher    MEDIUMBLOB NOT NULL COMMENT 'AES-256-GCM encrypted Fabric.js/PDF.js vector overlay JSON',
     flattened      TINYINT(1) NOT NULL DEFAULT 0,
+    created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_submission_page_marker (submission_id, page_number, marker_id),
+    UNIQUE KEY uq_submission_page_marker_version (submission_id, page_number, marker_id, version),
     CONSTRAINT fk_annotations_submission FOREIGN KEY (submission_id) REFERENCES submissions(id) ON DELETE CASCADE,
     CONSTRAINT fk_annotations_marker FOREIGN KEY (marker_id) REFERENCES users(id)
 ) ENGINE=InnoDB;

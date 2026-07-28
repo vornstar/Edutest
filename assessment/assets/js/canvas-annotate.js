@@ -11,6 +11,8 @@
 (function () {
     'use strict';
 
+    var PLACEHOLDER_TEXT = 'Comment';
+
     var canvasEl = document.getElementById('annotation-canvas');
     var studentLayerEl = document.getElementById('annotation-student-layer');
     if (!canvasEl || typeof fabric === 'undefined' || !window.PdfAnnotateCore) return;
@@ -19,11 +21,16 @@
     var submissionId = panel.dataset.submissionId;
     var csrfToken = panel.dataset.csrf;
     var container = canvasEl.closest('.script-pane') || canvasEl.parentElement;
+    var toolButtons = document.querySelectorAll('[data-tool]');
     var pagination = null;
     var fabricCanvas = null;
     var studentStaticCanvas = null;
-    var placingText = false;
     var lastRendered = null;
+    var placeholderText = null;
+    // Persists across page turns, unlike fabricCanvas itself, which is
+    // disposed and rebuilt fresh for every page - so the marker doesn't
+    // have to reselect "Pen" every time they turn a page.
+    var currentTool = 'pen';
     // The page whose content is currently loaded into fabricCanvas - NOT
     // the same as pagination.getPage(), which by the time renderPage() is
     // invoked already reflects the page being navigated TO. Every save
@@ -45,6 +52,7 @@
         if (!fabricCanvas) return;
         var active = fabricCanvas.getActiveObject();
         if (!active) return;
+        if (active === placeholderText) placeholderText = null;
         fabricCanvas.remove(active);
         fabricCanvas.discardActiveObject();
         fabricCanvas.requestRenderAll();
@@ -78,13 +86,16 @@
         // Silent: no popup, just the small status text, so paging through a
         // multi-page script doesn't interrupt with an alert per page.
         if (fabricCanvas) {
+            // No self-save here (unlike the text:editing:exited handler
+            // below) - the explicit saveAnnotation(currentPage) right after
+            // already captures the post-removal state.
+            discardPlaceholder();
             saveAnnotation(currentPage, true);
             fabricCanvas.dispose();
         }
         if (studentStaticCanvas) studentStaticCanvas.dispose();
         currentPage = pageNumber;
-        placingText = false;
-        canvasEl.style.cursor = '';
+        placeholderText = null;
 
         PdfAnnotateCore.renderPageToImage(pdfDoc, pageNumber, 1.4).then(function (rendered) {
             canvasEl.width = rendered.width;
@@ -96,26 +107,58 @@
             fabric.Image.fromURL(rendered.dataUrl, function (img) {
                 fabricCanvas.setBackgroundImage(img, fabricCanvas.renderAll.bind(fabricCanvas));
             });
-            fabricCanvas.freeDrawingBrush.width = 3;
-            fabricCanvas.freeDrawingBrush.color = currentColor();
+            applyTool(currentTool);
             fabricCanvas.on('mouse:down', function (opt) {
                 // Stays armed after placing one text box, so the next click
                 // starts another without re-clicking "Text" - but a click
                 // that lands ON an existing box edits/selects it instead.
-                if (!placingText || opt.target) return;
+                if (currentTool !== 'text' || opt.target) return;
+                // No self-save needed here - the new box's own 'object:added'
+                // debounce-saves the post-discard state (see wireTools()).
+                discardPlaceholder();
                 var pointer = fabricCanvas.getPointer(opt.e);
-                var text = new fabric.IText('Comment', {
+                var text = new fabric.IText(PLACEHOLDER_TEXT, {
                     left: pointer.x, top: pointer.y, fill: currentColor(), fontSize: 18,
                 });
+                placeholderText = text;
                 fabricCanvas.add(text);
                 fabricCanvas.setActiveObject(text);
                 text.enterEditing();
+                // Placeholder starts fully selected, so the very first
+                // keystroke replaces it instead of the marker having to
+                // clear it themselves first.
+                text.selectAll();
+            });
+            fabricCanvas.on('text:editing:exited', function (opt) {
+                // Clicking away without typing anything leaves an empty/
+                // still-placeholder box behind - remove it. Unlike the other
+                // discardPlaceholder() call sites, nothing else is about to
+                // save here, so trigger it explicitly.
+                if (opt.target === placeholderText && discardPlaceholder()) {
+                    saveAnnotation(currentPage, true);
+                }
             });
 
             wireTools();
             loadOwnAnnotation(pageNumber);
             renderStudentLayer(pageNumber, rendered.width, rendered.height);
         });
+    }
+
+    function isUnusedPlaceholder(textObj) {
+        return !textObj || textObj.text === PLACEHOLDER_TEXT || textObj.text.trim() === '';
+    }
+
+    /**
+     * Removes the tracked placeholder if it was never actually typed into.
+     * @return {boolean} true if a box was actually removed.
+     */
+    function discardPlaceholder() {
+        if (!placeholderText) return false;
+        var removed = isUnusedPlaceholder(placeholderText) && !!fabricCanvas;
+        if (removed) fabricCanvas.remove(placeholderText);
+        placeholderText = null;
+        return removed;
     }
 
     /** A non-interactive canvas stacked on top showing what the student typed/drew - pointer-events:none (set in CSS) lets clicks fall through to the marker's own canvas below. */
@@ -132,28 +175,35 @@
         }
     }
 
+    function applyTool(tool) {
+        currentTool = tool;
+        if (!fabricCanvas) return;
+        canvasEl.style.cursor = tool === 'text' ? 'crosshair' : '';
+        if (tool === 'pen') {
+            fabricCanvas.isDrawingMode = true;
+            fabricCanvas.freeDrawingBrush.width = 3;
+            fabricCanvas.freeDrawingBrush.color = currentColor();
+        } else if (tool === 'highlighter') {
+            fabricCanvas.isDrawingMode = true;
+            fabricCanvas.freeDrawingBrush.width = 16;
+            fabricCanvas.freeDrawingBrush.color = hexToRgba(currentColor(), 0.35);
+        } else if (tool === 'text') {
+            fabricCanvas.isDrawingMode = false;
+        }
+        toolButtons.forEach(function (btn) {
+            btn.classList.toggle('is-active', btn.dataset.tool === tool);
+        });
+    }
+
     function wireTools() {
-        document.querySelectorAll('[data-tool]').forEach(function (btn) {
+        toolButtons.forEach(function (btn) {
+            var tool = btn.dataset.tool;
+            if (tool !== 'pen' && tool !== 'highlighter' && tool !== 'text' && tool !== 'delete') return;
             btn.onclick = function () {
-                var tool = btn.dataset.tool;
-                if (tool === 'pen') {
-                    placingText = false;
-                    canvasEl.style.cursor = '';
-                    fabricCanvas.isDrawingMode = true;
-                    fabricCanvas.freeDrawingBrush.width = 3;
-                    fabricCanvas.freeDrawingBrush.color = currentColor();
-                } else if (tool === 'highlighter') {
-                    placingText = false;
-                    canvasEl.style.cursor = '';
-                    fabricCanvas.isDrawingMode = true;
-                    fabricCanvas.freeDrawingBrush.width = 16;
-                    fabricCanvas.freeDrawingBrush.color = hexToRgba(currentColor(), 0.35);
-                } else if (tool === 'text') {
-                    fabricCanvas.isDrawingMode = false;
-                    placingText = true;
-                    canvasEl.style.cursor = 'crosshair';
-                } else if (tool === 'delete') {
+                if (tool === 'delete') {
                     deleteSelected();
+                } else {
+                    applyTool(tool);
                 }
             };
         });
@@ -161,7 +211,7 @@
         var colorInput = document.querySelector('[data-tool="color"]');
         if (colorInput) {
             colorInput.oninput = function () {
-                fabricCanvas.freeDrawingBrush.color = colorInput.value;
+                fabricCanvas.freeDrawingBrush.color = currentTool === 'highlighter' ? hexToRgba(colorInput.value, 0.35) : colorInput.value;
             };
         }
 
@@ -215,6 +265,9 @@
     }
 
     window.addEventListener('beforeunload', function () {
-        if (fabricCanvas) saveAnnotation(currentPage, true);
+        if (fabricCanvas) {
+            discardPlaceholder();
+            saveAnnotation(currentPage, true);
+        }
     });
 })();

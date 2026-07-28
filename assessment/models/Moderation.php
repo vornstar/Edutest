@@ -39,6 +39,16 @@ final class Moderation
         return $stmt->fetch() ?: null;
     }
 
+    /** Whether this user is (or was) the secondary marker for a moderation review of this submission - used to let a moderator annotate the script even when they don't otherwise manage the paper (see MarkingController::requireMarkable). */
+    public static function isSecondaryMarker(int $submissionId, int $userId): bool
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT 1 FROM moderation_assignments WHERE submission_id = :submission_id AND secondary_marker_id = :user_id LIMIT 1'
+        );
+        $stmt->execute(['submission_id' => $submissionId, 'user_id' => $userId]);
+        return (bool) $stmt->fetchColumn();
+    }
+
     public static function forSecondaryMarker(int $userId): array
     {
         $stmt = Database::connection()->prepare(

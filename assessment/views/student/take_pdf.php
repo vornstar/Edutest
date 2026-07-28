@@ -11,8 +11,14 @@ require __DIR__ . '/../partials/header.php';
 require_once __DIR__ . '/../../models/Annotation.php';
 $existingStudentAnnotations = [];
 if (!$previewMode) {
+    // forSubmission() already returns just the latest version - but still
+    // spans every marker on this submission, so filter to the student's own
+    // id: if this attempt was already opened for marking (e.g. reopened by
+    // a teacher), a marker's row for the same page must never leak in here.
     foreach (Annotation::forSubmission((int) $submission['id']) as $a) {
-        $existingStudentAnnotations[(int) $a['page_number']] = json_decode($a['data_json'], true);
+        if ((int) $a['marker_id'] === (int) $submission['student_id']) {
+            $existingStudentAnnotations[(int) $a['page_number']] = json_decode($a['data_json'], true);
+        }
     }
 }
 ?>
@@ -29,7 +35,7 @@ if (!$previewMode) {
                 <div class="pdf-answer-tools">
                     <button type="button" data-answer-tool="pen">Pen</button>
                     <button type="button" data-answer-tool="text">Add text</button>
-                    <button type="button" data-answer-tool="delete">Delete selected</button>
+                    <button type="button" data-answer-tool="start-over" title="Clear this and start writing on the PDF again - your previous attempt isn't lost, your teacher can still see it.">Start over</button>
                     <button type="button" data-page-prev>&larr; Prev</button>
                     <span data-page-indicator>Page 1</span>
                     <button type="button" data-page-next>Next &rarr;</button>
