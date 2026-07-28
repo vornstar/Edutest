@@ -12,6 +12,7 @@
     'use strict';
 
     var PLACEHOLDER_TEXT = 'Comment';
+    var RENDER_SCALE = 1.8;
 
     var canvasEl = document.getElementById('annotation-canvas');
     var studentLayerEl = document.getElementById('annotation-student-layer');
@@ -22,6 +23,7 @@
     var csrfToken = panel.dataset.csrf;
     var container = canvasEl.closest('.script-pane') || canvasEl.parentElement;
     var toolButtons = document.querySelectorAll('[data-tool]');
+    var pageStorageKey = 'pdf-mark-page-' + submissionId;
     var pagination = null;
     var fabricCanvas = null;
     var studentStaticCanvas = null;
@@ -43,10 +45,44 @@
         clearTimeout(resizeTimer);
         resizeTimer = setTimeout(function () {
             if (!lastRendered) return;
-            if (fabricCanvas) PdfAnnotateCore.fitCanvasToContainer(fabricCanvas, container, lastRendered.width, lastRendered.height);
-            if (studentStaticCanvas) PdfAnnotateCore.fitCanvasToContainer(studentStaticCanvas, container, lastRendered.width, lastRendered.height);
+            if (fabricCanvas) {
+                PdfAnnotateCore.fitCanvasToContainer(fabricCanvas, container, lastRendered.width, lastRendered.height);
+                fabricCanvas.requestRenderAll();
+            }
+            if (studentStaticCanvas) {
+                PdfAnnotateCore.fitCanvasToContainer(studentStaticCanvas, container, lastRendered.width, lastRendered.height);
+                studentStaticCanvas.requestRenderAll();
+            }
         }, 150);
     });
+
+    // Some mobile browsers leave a canvas's on-screen pixels stale after
+    // it's scrolled out of view and back (or the tab is backgrounded/
+    // restored from cache) - the marking is there, it just isn't repainted
+    // until something else forces the browser's hand. Force one ourselves
+    // on the events known to trigger this.
+    var forceRepaint = throttle(function () {
+        if (fabricCanvas) fabricCanvas.requestRenderAll();
+        if (studentStaticCanvas) studentStaticCanvas.requestRenderAll();
+    }, 200);
+    window.addEventListener('scroll', forceRepaint, { passive: true });
+    document.addEventListener('visibilitychange', forceRepaint);
+    window.addEventListener('pageshow', forceRepaint);
+
+    function throttle(fn, ms) {
+        var last = 0, timer = null;
+        return function () {
+            var now = Date.now();
+            var remaining = ms - (now - last);
+            if (remaining <= 0) {
+                last = now;
+                fn();
+            } else {
+                clearTimeout(timer);
+                timer = setTimeout(function () { last = Date.now(); fn(); }, remaining);
+            }
+        };
+    }
 
     function deleteSelected() {
         if (!fabricCanvas) return;
@@ -75,7 +111,11 @@
             pdfDoc.numPages,
             function (pageNumber) { renderPage(pdfDoc, pageNumber); }
         );
-        pagination.setPage(1);
+        // Resume on the page the marker was last on (e.g. after a refresh)
+        // rather than always restarting at page 1.
+        var savedPage = parseInt(window.localStorage.getItem(pageStorageKey), 10);
+        var startPage = savedPage >= 1 && savedPage <= pdfDoc.numPages ? savedPage : 1;
+        pagination.setPage(startPage);
     }).catch(function (err) {
         console.error('Failed to render PDF for annotation', err);
     });
@@ -96,17 +136,15 @@
         if (studentStaticCanvas) studentStaticCanvas.dispose();
         currentPage = pageNumber;
         placeholderText = null;
+        try { window.localStorage.setItem(pageStorageKey, String(pageNumber)); } catch (e) { /* storage unavailable - not fatal, just won't resume on refresh */ }
 
-        PdfAnnotateCore.renderPageToImage(pdfDoc, pageNumber, 1.4).then(function (rendered) {
+        PdfAnnotateCore.renderPageToImage(pdfDoc, pageNumber, RENDER_SCALE).then(function (rendered) {
             canvasEl.width = rendered.width;
             canvasEl.height = rendered.height;
             lastRendered = rendered;
 
             fabricCanvas = new fabric.Canvas(canvasEl, { isDrawingMode: true });
             PdfAnnotateCore.fitCanvasToContainer(fabricCanvas, container, rendered.width, rendered.height);
-            fabric.Image.fromURL(rendered.dataUrl, function (img) {
-                fabricCanvas.setBackgroundImage(img, fabricCanvas.renderAll.bind(fabricCanvas));
-            });
             applyTool(currentTool);
             fabricCanvas.on('mouse:down', function (opt) {
                 // Stays armed after placing one text box, so the next click
@@ -140,8 +178,19 @@
             });
 
             wireTools();
-            loadOwnAnnotation(pageNumber);
-            renderStudentLayer(pageNumber, rendered.width, rendered.height);
+
+            // The background script/PDF page must finish painting before
+            // the marker's own existing marks (and the student's read-only
+            // reference layer) are loaded on top of it - doing both at once
+            // (previously: fired in parallel, whichever finished last
+            // "won") could leave the page's own image absent.
+            fabric.Image.fromURL(rendered.dataUrl, function (img) {
+                fabricCanvas.setBackgroundImage(img, function () {
+                    fabricCanvas.requestRenderAll();
+                    loadOwnAnnotation(pageNumber);
+                    renderStudentLayer(pageNumber, rendered.width, rendered.height);
+                });
+            });
         });
     }
 
@@ -171,7 +220,9 @@
 
         var studentJson = window.__studentAnnotations && window.__studentAnnotations[pageNumber];
         if (studentJson) {
-            studentStaticCanvas.loadFromJSON(studentJson, studentStaticCanvas.renderAll.bind(studentStaticCanvas));
+            studentStaticCanvas.loadFromJSON(studentJson, function () {
+                studentStaticCanvas.requestRenderAll();
+            });
         }
     }
 
@@ -236,7 +287,9 @@
     function loadOwnAnnotation(pageNumber) {
         var existing = window.__existingAnnotations && window.__existingAnnotations[pageNumber];
         if (existing) {
-            fabricCanvas.loadFromJSON(existing, fabricCanvas.renderAll.bind(fabricCanvas));
+            fabricCanvas.loadFromJSON(existing, function () {
+                fabricCanvas.requestRenderAll();
+            });
         }
     }
 
@@ -246,12 +299,19 @@
         var pageNumber = page !== undefined ? page : currentPage;
         var statusEl = document.getElementById('annotation-save-status');
         if (statusEl) statusEl.textContent = 'Saving…';
+        var json = fabricCanvas.toJSON();
+        // Keep the local cache in sync with what's actually saved - without
+        // this, navigating back to this page later in the SAME session (no
+        // full reload) would still be looking at whatever was here when the
+        // page first loaded, not what was just marked.
+        window.__existingAnnotations = window.__existingAnnotations || {};
+        window.__existingAnnotations[pageNumber] = json;
         fetch('/assessment/teacher/marking/' + submissionId + '/annotation', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 page: pageNumber,
-                fabric_json: fabricCanvas.toJSON(),
+                fabric_json: json,
                 csrf_token: csrfToken,
             }),
         }).then(function (res) {

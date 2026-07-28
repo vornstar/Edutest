@@ -31,6 +31,7 @@
     var statusEl = document.getElementById('pdf-answer-status');
     var container = canvasEl.closest('.pdf-pane') || canvasEl.parentElement;
     var toolButtons = document.querySelectorAll('[data-answer-tool]');
+    var pageStorageKey = 'pdf-answer-page-' + submissionId;
     var pagination = null;
     var fabricCanvas = null;
     var saveTimer = null;
@@ -53,9 +54,38 @@
         resizeTimer = setTimeout(function () {
             if (fabricCanvas && lastRendered) {
                 PdfAnnotateCore.fitCanvasToContainer(fabricCanvas, container, lastRendered.width, lastRendered.height);
+                fabricCanvas.requestRenderAll();
             }
         }, 150);
     });
+
+    // Some mobile browsers leave a canvas's on-screen pixels stale after
+    // it's scrolled out of view and back (or the tab is backgrounded/
+    // restored from cache) - the drawing is there, it just isn't
+    // repainted until something else forces the browser's hand. Force one
+    // ourselves on the events known to trigger this, rather than leaving
+    // it to look "blank until you write on it again".
+    var forceRepaint = throttle(function () {
+        if (fabricCanvas) fabricCanvas.requestRenderAll();
+    }, 200);
+    window.addEventListener('scroll', forceRepaint, { passive: true });
+    document.addEventListener('visibilitychange', forceRepaint);
+    window.addEventListener('pageshow', forceRepaint);
+
+    function throttle(fn, ms) {
+        var last = 0, timer = null;
+        return function () {
+            var now = Date.now();
+            var remaining = ms - (now - last);
+            if (remaining <= 0) {
+                last = now;
+                fn();
+            } else {
+                clearTimeout(timer);
+                timer = setTimeout(function () { last = Date.now(); fn(); }, remaining);
+            }
+        };
+    }
 
     PdfAnnotateCore.loadDocument(canvasEl.dataset.pdfSrc).then(function (pdfDoc) {
         pagination = PdfAnnotateCore.wirePagination(
@@ -63,7 +93,11 @@
             pdfDoc.numPages,
             function (pageNumber) { renderPage(pdfDoc, pageNumber); }
         );
-        pagination.setPage(1);
+        // Resume on the page the student was last on (e.g. after a
+        // refresh) rather than always restarting at page 1.
+        var savedPage = parseInt(window.localStorage.getItem(pageStorageKey), 10);
+        var startPage = savedPage >= 1 && savedPage <= pdfDoc.numPages ? savedPage : 1;
+        pagination.setPage(startPage);
     }).catch(function (err) {
         console.error('Failed to load PDF for answering', err);
         if (statusEl) statusEl.textContent = 'Could not load the PDF.';
@@ -86,6 +120,7 @@
         }
         currentPage = pageNumber;
         placeholderText = null;
+        try { window.localStorage.setItem(pageStorageKey, String(pageNumber)); } catch (e) { /* storage unavailable - not fatal, just won't resume on refresh */ }
 
         PdfAnnotateCore.renderPageToImage(pdfDoc, pageNumber, 1.4).then(function (rendered) {
             canvasEl.width = rendered.width;
@@ -94,9 +129,6 @@
 
             fabricCanvas = new fabric.Canvas(canvasEl, { isDrawingMode: false });
             PdfAnnotateCore.fitCanvasToContainer(fabricCanvas, container, rendered.width, rendered.height);
-            fabric.Image.fromURL(rendered.dataUrl, function (img) {
-                fabricCanvas.setBackgroundImage(img, fabricCanvas.renderAll.bind(fabricCanvas));
-            });
             fabricCanvas.freeDrawingBrush.width = 2;
             fabricCanvas.freeDrawingBrush.color = STUDENT_COLOR;
             applyTool(currentTool);
@@ -136,7 +168,17 @@
                 }
             });
 
-            loadExisting(pageNumber);
+            // The background PDF page must finish painting before the
+            // student's own existing marks are loaded on top of it - doing
+            // both at once (previously: fired in parallel, whichever
+            // finished last "won") could leave the page's own image absent
+            // if loadFromJSON's render happened to land first.
+            fabric.Image.fromURL(rendered.dataUrl, function (img) {
+                fabricCanvas.setBackgroundImage(img, function () {
+                    fabricCanvas.requestRenderAll();
+                    loadExisting(pageNumber);
+                });
+            });
         });
     }
 
@@ -216,12 +258,19 @@
     function saveNow(page) {
         if (!fabricCanvas) return;
         var pageNumber = page !== undefined ? page : currentPage;
+        var json = fabricCanvas.toJSON();
+        // Keep the local cache in sync with what's actually saved - without
+        // this, navigating back to this page later in the SAME session (no
+        // full reload) would still be looking at whatever was here when the
+        // page first loaded, not what was just written.
+        window.__existingStudentAnnotations = window.__existingStudentAnnotations || {};
+        window.__existingStudentAnnotations[pageNumber] = json;
         fetch('/assessment/student/submissions/' + submissionId + '/annotation', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 page: pageNumber,
-                fabric_json: fabricCanvas.toJSON(),
+                fabric_json: json,
                 csrf_token: csrfToken,
             }),
         }).then(function (res) {
@@ -235,7 +284,9 @@
     function loadExisting(pageNumber) {
         var existing = window.__existingStudentAnnotations && window.__existingStudentAnnotations[pageNumber];
         if (existing) {
-            fabricCanvas.loadFromJSON(existing, fabricCanvas.renderAll.bind(fabricCanvas));
+            fabricCanvas.loadFromJSON(existing, function () {
+                fabricCanvas.requestRenderAll();
+            });
         }
     }
 

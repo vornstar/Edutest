@@ -72,6 +72,11 @@ body {
 .user-chip a { color: var(--color-primary); text-decoration: none; }
 
 .app-main { max-width: 1100px; margin: 1.5rem auto; padding: 0 1rem; }
+/* The marking screen wants all the width it can get for the script itself -
+   widen its container beyond the site's usual reading-width cap. Falls back
+   to the normal 1100px in browsers without :has() support, which just means
+   less extra room, not broken layout. */
+.app-main:has(.marking-panel) { max-width: 1500px; }
 
 .panel {
     background: var(--color-panel);
@@ -130,8 +135,8 @@ input[type="file"], select, textarea {
    splitting the screen and capping how big the paper itself can render. */
 .pdf-split { display: flex; flex-direction: column; gap: 1.5rem; }
 .mark-split { display: flex; gap: 1.5rem; align-items: flex-start; }
-.script-pane { flex: 2.3; min-width: 0; }
-.mark-pane { flex: 1; min-width: 0; max-width: 340px; }
+.script-pane { flex: 4; min-width: 0; }
+.mark-pane { flex: 1; min-width: 0; max-width: 300px; }
 
 /* height:auto is essential here: the canvas's actual pixel size is set via
    JS to match the rendered PDF page (often 800-1200px+ tall), and without
