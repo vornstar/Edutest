@@ -121,17 +121,20 @@
      */
     function wirePagination(container, totalPages, onPageChange) {
         var current = 1;
+        var firstBtn = container.querySelector('[data-page-first]');
         var prevBtn = container.querySelector('[data-page-prev]');
         var nextBtn = container.querySelector('[data-page-next]');
         var indicator = container.querySelector('[data-page-indicator]');
 
         function render() {
             if (indicator) indicator.textContent = 'Page ' + current + ' of ' + totalPages;
+            if (firstBtn) firstBtn.disabled = current <= 1;
             if (prevBtn) prevBtn.disabled = current <= 1;
             if (nextBtn) nextBtn.disabled = current >= totalPages;
             onPageChange(current);
         }
 
+        if (firstBtn) firstBtn.addEventListener('click', function () { if (current > 1) { current = 1; render(); } });
         if (prevBtn) prevBtn.addEventListener('click', function () { if (current > 1) { current--; render(); } });
         if (nextBtn) nextBtn.addEventListener('click', function () { if (current < totalPages) { current++; render(); } });
 

@@ -104,6 +104,36 @@ final class ModerationController
             ? GradeBoundary::gradeForPercent($boundaries, Mark::totalScore((int) $submission['id'], 'moderation') / $maxMarksTotal * 100)
             : null;
 
+        // Stamped onto the first page of the "Download annotated PDF" export
+        // (see canvas-annotate.js) - not shown anywhere else on this screen.
+        // Marker/mark info stays gated behind $showPrimary too, same as the
+        // rest of this view - an export shouldn't leak what a blind review is
+        // deliberately hiding on screen.
+        $student = User::find((int) $submission['student_id']);
+        $exportStamp = [
+            'studentName' => $student['display_name'] ?? '',
+            'testTitle' => $paper['title'],
+            'mark' => null,
+            'markerSurname' => null,
+            'moderatorSurname' => null,
+        ];
+        if ($showPrimary) {
+            if ($primaryMarks) {
+                $primaryMarker = User::find((int) reset($primaryMarks)['marker_id']);
+                if ($primaryMarker) $exportStamp['markerSurname'] = User::surnameSortKey($primaryMarker['display_name']);
+            }
+            $finalMarkValue = $primaryMarks ? Mark::totalScore((int) $submission['id'], 'primary') : null;
+            $finishedModeration = Moderation::latestFinishedForSubmission((int) $submission['id']);
+            if ($finishedModeration) {
+                $moderator = User::find((int) $finishedModeration['secondary_marker_id']);
+                if ($moderator) $exportStamp['moderatorSurname'] = User::surnameSortKey($moderator['display_name']);
+                $finalMarkValue = Mark::totalScore((int) $submission['id'], 'moderation');
+            }
+            $exportStamp['mark'] = $finalMarkValue !== null
+                ? Mark::format($finalMarkValue) . ($maxMarksTotal > 0 ? '/' . Mark::format((float) $maxMarksTotal) : '')
+                : null;
+        }
+
         require __DIR__ . '/../views/teacher/moderation_review.php';
     }
 

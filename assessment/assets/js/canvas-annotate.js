@@ -613,6 +613,43 @@
         });
     }
 
+    /** "<student name> - <test title>.pdf", falling back to the submission id if either piece of window.__exportStamp is missing - see exportAnnotatedPdf(). */
+    function exportFilename() {
+        var meta = window.__exportStamp || {};
+        var stripUnsafe = function (s) { return String(s || '').replace(/[\\/:*?"<>|]/g, '-').trim(); };
+        var parts = [stripUnsafe(meta.studentName), stripUnsafe(meta.testTitle)].filter(function (s) { return s !== ''; });
+        return (parts.length ? parts.join(' - ') : 'submission-' + submissionId) + '.pdf';
+    }
+
+    /**
+     * Stamps the student's name (top left) and the mark/marker/moderator
+     * (top right) onto the first page only, for exportAnnotatedPdf() below.
+     * window.__exportStamp is set server-side (see MarkingController::
+     * markSubmission()/ModerationController::review()) - fields are omitted
+     * (null/empty) rather than guessed at when there's nothing to show yet,
+     * e.g. an unmarked submission has no mark or marker surname.
+     */
+    function addExportStampToPage(flatCanvas, pageWidth) {
+        var meta = window.__exportStamp || {};
+        var textOptions = { fontSize: 16, fontWeight: 'bold', fill: '#000', backgroundColor: 'rgba(255,255,255,0.85)' };
+
+        if (meta.studentName) {
+            flatCanvas.add(new fabric.Text(meta.studentName, Object.assign({
+                left: 12, top: 12, originX: 'left', originY: 'top',
+            }, textOptions)));
+        }
+
+        var rightLines = [];
+        if (meta.mark) rightLines.push('Mark: ' + meta.mark);
+        if (meta.markerSurname) rightLines.push('Marked by: ' + meta.markerSurname);
+        if (meta.moderatorSurname) rightLines.push('Moderated by: ' + meta.moderatorSurname);
+        if (rightLines.length) {
+            flatCanvas.add(new fabric.Text(rightLines.join('\n'), Object.assign({
+                left: pageWidth - 12, top: 12, originX: 'right', originY: 'top', textAlign: 'right',
+            }, textOptions)));
+        }
+    }
+
     /**
      * Renders one page's background image plus this marker's own marks and
      * the student's own layer into a single flattened image, for
@@ -646,6 +683,7 @@
                             // loadFromJSON() resets backgroundImage - re-apply, same
                             // workaround as loadOwnAnnotation() above.
                             flatCanvas.setBackgroundImage(img, function () {
+                                if (pageNumber === 1) addExportStampToPage(flatCanvas, rendered.width);
                                 flatCanvas.renderAll();
                                 resolve({
                                     dataUrl: flatCanvas.toDataURL({ format: 'jpeg', quality: 0.92 }),
@@ -701,7 +739,7 @@
                 }
                 doc.addImage(page.dataUrl, 'JPEG', 0, 0, page.widthPt, page.heightPt);
             });
-            doc.save('submission-' + submissionId + '-annotated.pdf');
+            doc.save(exportFilename());
             if (btn) { btn.disabled = false; btn.textContent = 'Download annotated PDF'; }
         }).catch(function (err) {
             console.error('Failed to build annotated PDF', err);

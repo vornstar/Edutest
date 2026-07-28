@@ -152,6 +152,35 @@ final class MarkingController
             ? GradeBoundary::gradeForPercent($boundaries, Mark::totalScore($submissionId, 'primary') / $maxMarksTotal * 100)
             : null;
 
+        // Stamped onto the first page of the "Download annotated PDF" export
+        // (see canvas-annotate.js) - not shown anywhere else on this screen.
+        // Prefers the moderation total/moderator once moderation has actually
+        // finished, since that's the mark that stands, over whatever the
+        // primary marker originally gave.
+        $student = User::find($studentId);
+        $markerSurname = null;
+        if ($primaryMarks) {
+            $primaryMarker = User::find((int) reset($primaryMarks)['marker_id']);
+            if ($primaryMarker) $markerSurname = User::surnameSortKey($primaryMarker['display_name']);
+        }
+        $moderatorSurname = null;
+        $finalMarkValue = $primaryMarks ? Mark::totalScore($submissionId, 'primary') : null;
+        $finishedModeration = Moderation::latestFinishedForSubmission($submissionId);
+        if ($finishedModeration) {
+            $moderator = User::find((int) $finishedModeration['secondary_marker_id']);
+            if ($moderator) $moderatorSurname = User::surnameSortKey($moderator['display_name']);
+            $finalMarkValue = Mark::totalScore($submissionId, 'moderation');
+        }
+        $exportStamp = [
+            'studentName' => $student['display_name'] ?? '',
+            'testTitle' => $paper['title'],
+            'mark' => $finalMarkValue !== null
+                ? Mark::format($finalMarkValue) . ($maxMarksTotal > 0 ? '/' . Mark::format((float) $maxMarksTotal) : '')
+                : null,
+            'markerSurname' => $markerSurname,
+            'moderatorSurname' => $moderatorSurname,
+        ];
+
         require __DIR__ . '/../views/teacher/mark_submission.php';
     }
 

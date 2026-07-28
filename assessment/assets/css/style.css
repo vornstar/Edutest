@@ -211,6 +211,13 @@ input[type="file"], select, textarea {
 }
 
 .tool-divider { display: inline-block; width: 1px; align-self: stretch; background: var(--color-border); margin: 0 0.15rem; }
+/* Clusters related controls (drawing tools, page nav, ...) so the toolbar reads as a
+   few groups rather than one long flat row - see mark_submission.php/moderation_review.php.
+   flex-wrap here too so a group breaks internally rather than overflowing on very narrow screens. */
+.tool-group { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.annotation-actions-menu { gap: 0.4rem; min-width: 14rem; }
+.annotation-actions-menu .btn { display: block; width: 100%; box-sizing: border-box; text-align: center; }
+.annotation-actions-menu .autosave-status { font-size: 0.8rem; text-align: center; }
 .annotation-tools .nav-dropdown summary {
     padding: 0.4rem 0.6rem;
     border: 1px solid var(--color-border);

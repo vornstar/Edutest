@@ -72,19 +72,31 @@ $__toolBtn = static function (string $tool, string $label, ?string $baseTitle = 
                 <?php endif; ?>
 
                 <div class="annotation-tools">
-                    <?= $__toolBtn('pen', 'Pen') ?>
-                    <?= $__toolBtn('highlighter', 'Highlighter') ?>
-                    <?= $__toolBtn('text', 'Text') ?>
-                    <?= $__toolBtn('circle', 'Circle', 'Drag to circle a mark - or just click for a default-sized circle') ?>
-                    <?= $__toolBtn('delete', 'Delete selected') ?>
-                    <input type="color" data-tool="color" value="<?= htmlspecialchars($__branding['teacher_marking_color'] ?? Branding::DEFAULT_TEACHER_MARKING_COLOR) ?>">
+                    <div class="tool-group">
+                        <?= $__toolBtn('pen', 'Pen') ?>
+                        <?= $__toolBtn('highlighter', 'Highlighter') ?>
+                        <?= $__toolBtn('text', 'Text') ?>
+                        <?= $__toolBtn('circle', 'Circle', 'Drag to circle a mark - or just click for a default-sized circle') ?>
+                        <?= $__toolBtn('delete', 'Delete selected') ?>
+                        <input type="color" data-tool="color" value="<?= htmlspecialchars($__branding['teacher_marking_color'] ?? Branding::DEFAULT_TEACHER_MARKING_COLOR) ?>">
+                    </div>
                     <?php require __DIR__ . '/../partials/stamp_toolbar.php'; ?>
-                    <button type="button" id="save-annotation">Save annotations</button>
-                    <span class="autosave-status" id="annotation-save-status">Also saves automatically when you change page.</span>
-                    <button type="button" id="export-annotated-pdf" title="Flattens the script and every annotation layer into one PDF, to save or print">Download annotated PDF</button>
-                    <button type="button" data-page-prev>&larr; Prev</button>
-                    <span data-page-indicator>Page 1</span>
-                    <button type="button" data-page-next>Next &rarr;</button>
+                    <span class="tool-divider" aria-hidden="true"></span>
+                    <div class="tool-group">
+                        <button type="button" data-page-first title="Go to first page">&#8676; First</button>
+                        <button type="button" data-page-prev>&larr; Prev</button>
+                        <span data-page-indicator>Page 1</span>
+                        <button type="button" data-page-next>Next &rarr;</button>
+                    </div>
+                    <span class="tool-divider" aria-hidden="true"></span>
+                    <details class="nav-dropdown">
+                        <summary title="Save annotations, or download a flattened PDF copy">Actions</summary>
+                        <div class="nav-dropdown-menu annotation-actions-menu">
+                            <button type="button" id="save-annotation" class="btn">Save annotations</button>
+                            <span class="autosave-status" id="annotation-save-status">Also saves automatically when you change page.</span>
+                            <button type="button" id="export-annotated-pdf" class="btn" title="Flattens the script and every annotation layer into one PDF, to save or print">Download annotated PDF</button>
+                        </div>
+                    </details>
                 </div>
                 <div class="annotation-stack">
                     <?php if ($submission['scan_drive_item_id']): ?>
@@ -162,6 +174,7 @@ $__toolBtn = static function (string $tool, string $label, ?string $baseTitle = 
 <script>
 window.__existingAnnotations = <?= json_encode($teacherAnnotations) ?>;
 window.__studentAnnotations = <?= json_encode($studentAnnotations) ?>;
+window.__exportStamp = <?= json_encode($exportStamp, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>

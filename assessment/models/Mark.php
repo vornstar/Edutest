@@ -96,4 +96,10 @@ final class Mark
         $marks = self::latestForSubmission($submissionId, $type);
         return array_sum(array_column($marks, 'score'));
     }
+
+    /** "42" for a whole number, "42.5" for a half-mark - avoids a "42.0"-style trailing zero wherever a raw score is shown as text. */
+    public static function format(float $score): string
+    {
+        return rtrim(rtrim(number_format(round($score, 1), 1, '.', ''), '0'), '.');
+    }
 }

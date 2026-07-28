@@ -103,6 +103,16 @@ final class Moderation
         return ['variance' => $variance, 'exceeded_tolerance' => $exceeded];
     }
 
+    /** The most recently finished (completed or flagged - both mean a secondary marker actually submitted their review) moderation pass for a submission, or null if none has finished yet. Used to resolve the "final" mark/moderator for the annotated PDF export - see MarkingController/ModerationController. */
+    public static function latestFinishedForSubmission(int $submissionId): ?array
+    {
+        $stmt = Database::connection()->prepare(
+            "SELECT * FROM moderation_assignments WHERE submission_id = :submission_id AND status IN ('completed', 'flagged') ORDER BY completed_at DESC LIMIT 1"
+        );
+        $stmt->execute(['submission_id' => $submissionId]);
+        return $stmt->fetch() ?: null;
+    }
+
     public static function flaggedForDepartment(): array
     {
         $stmt = Database::connection()->query(
