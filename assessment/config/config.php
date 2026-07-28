@@ -33,10 +33,9 @@ $GLOBALS['__assessment_config'] = [
     // The software's own product name (distinct from a school's own
     // branding/house style - see models/Branding.php and Admin >
     // Branding, which is what actually shows in the header). Used only on
-    // the About page. Placeholder pending a real choice - see the naming
-    // suggestions given alongside this feature; change freely, here or via
-    // ASSESSMENT_PRODUCT_NAME in .env.php, no code change needed either way.
-    'product_name' => env('ASSESSMENT_PRODUCT_NAME', 'Markwell'),
+    // the About page. Change freely here, or via ASSESSMENT_PRODUCT_NAME
+    // in .env.php, no code change needed either way.
+    'product_name' => env('ASSESSMENT_PRODUCT_NAME', 'ClassGrade'),
 
     'db' => [
         'host' => env('DB_HOST', 'localhost'),
