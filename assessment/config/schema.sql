@@ -240,6 +240,20 @@ CREATE TABLE IF NOT EXISTS custom_stamps (
     CONSTRAINT fk_custom_stamps_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- A single-row "settings" table (always id=1) so a school can put its own
+-- house style on the platform - name, logo, and a couple of brand colours -
+-- without a code change or redeploy. See models/Branding.php. This is
+-- deployment-wide (one school per deployment, per the OneDrive/Graph
+-- tenant model everything else here already assumes), not per-user.
+CREATE TABLE IF NOT EXISTS branding (
+    id            TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+    school_name   VARCHAR(255) NOT NULL DEFAULT 'Assessment Platform',
+    logo_filename VARCHAR(255) NULL COMMENT 'Filename only (not a path), under assets/uploads/branding/ - NULL = no logo uploaded, the header shows school_name as text instead.',
+    primary_color CHAR(7) NULL COMMENT 'Hex e.g. #2952e3 - overrides --color-primary (buttons, links, brand text). NULL = platform default.',
+    accent_color  CHAR(7) NULL COMMENT 'Hex e.g. #b3261e - overrides --color-accent (a secondary highlight, e.g. the header underline). NULL = platform default.',
+    updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS audit_log (
     id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     entity_type   VARCHAR(64) NOT NULL,

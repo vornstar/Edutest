@@ -5,6 +5,7 @@ require_once __DIR__ . '/AuthController.php';
 require_once __DIR__ . '/../models/User.php';
 require_once __DIR__ . '/../models/AuditLog.php';
 require_once __DIR__ . '/../models/Subject.php';
+require_once __DIR__ . '/../models/Branding.php';
 require_once __DIR__ . '/../services/OneDriveService.php';
 
 /**
@@ -168,5 +169,99 @@ final class AdminController
 
         header('Location: /assessment/admin/subjects');
         exit;
+    }
+
+    /** Only these image types are accepted for a logo upload - deliberately excludes SVG (script-content risk) even though it'd otherwise be a natural fit for a crisp logo. */
+    private const ALLOWED_LOGO_TYPES = [
+        'image/png' => 'png',
+        'image/jpeg' => 'jpg',
+        'image/webp' => 'webp',
+    ];
+
+    public static function branding(): void
+    {
+        AuthController::requireRole([User::ROLE_ADMIN]);
+        $branding = Branding::get();
+        require __DIR__ . '/../views/admin/branding.php';
+    }
+
+    /** School name, brand colours, and (optionally) a logo - see Branding model and views/admin/branding.php. */
+    public static function updateBranding(): void
+    {
+        AuthController::requireRole([User::ROLE_ADMIN]);
+        AuthController::verifyCsrf();
+
+        $current = Branding::get();
+        $schoolName = trim((string) ($_POST['school_name'] ?? '')) ?: 'Assessment Platform';
+        // <input type="color"> always submits SOME value, so there's no way to tell "left it
+        // alone" apart from "chose this specific colour" - a checkbox is the only clean way to
+        // let a school explicitly go back to the platform default rather than just picking colours.
+        $primaryColor = !empty($_POST['reset_primary_color']) ? null : self::normalizeHexColor((string) ($_POST['primary_color'] ?? ''));
+        $accentColor = !empty($_POST['reset_accent_color']) ? null : self::normalizeHexColor((string) ($_POST['accent_color'] ?? ''));
+
+        $logoFilename = $current['logo_filename'];
+        if (!empty($_FILES['logo']['tmp_name']) && is_uploaded_file($_FILES['logo']['tmp_name'])) {
+            $logoFilename = self::storeLogoUpload($_FILES['logo']);
+        } elseif (!empty($_POST['remove_logo'])) {
+            self::deleteLogoFile($logoFilename);
+            $logoFilename = null;
+        }
+
+        Branding::save($schoolName, $logoFilename, $primaryColor, $accentColor);
+
+        header('Location: /assessment/admin/branding');
+        exit;
+    }
+
+    private static function logoDir(): string
+    {
+        return ASSESSMENT_ROOT . '/assets/uploads/branding';
+    }
+
+    /** Saves the upload as logo.<ext> (clearing any previous logo.* first, in case the extension changed), so old references never need updating and there's never more than one file sitting around. */
+    private static function storeLogoUpload(array $file): string
+    {
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime = finfo_file($finfo, $file['tmp_name']);
+        finfo_close($finfo);
+
+        $ext = self::ALLOWED_LOGO_TYPES[$mime] ?? null;
+        if ($ext === null) {
+            http_response_code(422);
+            echo 'Logo must be a PNG, JPEG, or WebP image.';
+            exit;
+        }
+
+        $dir = self::logoDir();
+        if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
+            http_response_code(500);
+            echo 'Could not create the upload directory.';
+            exit;
+        }
+        foreach (glob($dir . '/logo.*') ?: [] as $existing) {
+            @unlink($existing);
+        }
+
+        $filename = 'logo.' . $ext;
+        if (!move_uploaded_file($file['tmp_name'], $dir . '/' . $filename)) {
+            http_response_code(500);
+            echo 'Failed to save the uploaded logo.';
+            exit;
+        }
+
+        return $filename;
+    }
+
+    private static function deleteLogoFile(?string $filename): void
+    {
+        if ($filename) {
+            @unlink(self::logoDir() . '/' . $filename);
+        }
+    }
+
+    private static function normalizeHexColor(string $value): ?string
+    {
+        $value = trim($value);
+        return preg_match('/^#[0-9a-fA-F]{6}$/', $value) ? strtolower($value) : null;
     }
 }

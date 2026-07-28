@@ -35,6 +35,7 @@ require_once __DIR__ . '/controllers/FileProxyController.php';
 require_once __DIR__ . '/controllers/ScanUploadController.php';
 require_once __DIR__ . '/controllers/AdminController.php';
 require_once __DIR__ . '/controllers/DataController.php';
+require_once __DIR__ . '/controllers/PagesController.php';
 
 $scriptDir = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/');
 $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
@@ -58,6 +59,8 @@ function route_match(string $pattern, string $path): ?array
 $routes = [
     ['GET', '/', [HomeController::class, 'index']],
     ['GET', '/logout', [AuthController::class, 'logout']],
+    ['GET', '/about', [PagesController::class, 'about']],
+    ['GET', '/instructions', [PagesController::class, 'instructions']],
 
     // Student portal
     ['GET', '/student', [StudentController::class, 'dashboard']],
@@ -148,6 +151,8 @@ $routes = [
     ['POST', '/admin/users/{id}/managed-subject', [AdminController::class, 'setManagedSubject']],
     ['GET', '/admin/onedrive-lookup', [AdminController::class, 'oneDriveLookup']],
     ['GET', '/admin/audit', [AdminController::class, 'auditLog']],
+    ['GET', '/admin/branding', [AdminController::class, 'branding']],
+    ['POST', '/admin/branding', [AdminController::class, 'updateBranding']],
     ['GET', '/admin/subjects', [AdminController::class, 'subjects']],
     ['POST', '/admin/subjects/add', [AdminController::class, 'addSubject']],
     ['POST', '/admin/subjects/{id}/rename', [AdminController::class, 'renameSubject']],

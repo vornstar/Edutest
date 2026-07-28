@@ -2,6 +2,9 @@
 /** @var array|null $__user Set by AuthController before including views; falls back to session. */
 $__user = $__user ?? (AuthController::currentUser() ?? null);
 $__title = $__title ?? 'Assessment Platform';
+
+require_once __DIR__ . '/../../models/Branding.php';
+$__branding = Branding::get();
 ?>
 <!doctype html>
 <html lang="en">
@@ -11,10 +14,28 @@ $__title = $__title ?? 'Assessment Platform';
 <title><?= htmlspecialchars($__title) ?></title>
 <link rel="stylesheet" href="<?= asset_url('/assets/css/style.css') ?>">
 <script src="<?= asset_url('/assets/js/nav.js') ?>" defer></script>
+<?php if ($__branding['primary_color'] || $__branding['accent_color']): ?>
+<style>
+:root {
+<?php if ($__branding['primary_color']): ?>
+    --color-primary: <?= htmlspecialchars($__branding['primary_color']) ?>;
+<?php endif; ?>
+<?php if ($__branding['accent_color']): ?>
+    --color-accent: <?= htmlspecialchars($__branding['accent_color']) ?>;
+<?php endif; ?>
+}
+</style>
+<?php endif; ?>
 </head>
 <body>
-<header class="app-header">
-    <a class="brand" href="/assessment/">Assessment Platform</a>
+<header class="app-header<?= $__branding['accent_color'] ? ' has-accent' : '' ?>">
+    <a class="brand" href="/assessment/">
+        <?php if ($__branding['logo_filename']): ?>
+            <img class="brand-logo" src="<?= htmlspecialchars(asset_url('/assets/uploads/branding/' . $__branding['logo_filename'])) ?>" alt="<?= htmlspecialchars($__branding['school_name']) ?>">
+        <?php else: ?>
+            <?= htmlspecialchars($__branding['school_name']) ?>
+        <?php endif; ?>
+    </a>
     <?php if ($__user): ?>
     <nav class="main-nav">
         <?php require __DIR__ . '/nav.php'; ?>

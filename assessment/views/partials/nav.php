@@ -63,6 +63,7 @@ $hasActive = static function (array $hrefs) use ($path): bool {
         <div class="nav-dropdown-menu">
             <a href="/assessment/admin/users">Users</a>
             <a href="/assessment/admin/subjects">Subjects</a>
+            <a href="/assessment/admin/branding">Branding</a>
             <a href="/assessment/admin/audit">Audit log</a>
             <a href="/assessment/admin/onedrive-lookup">OneDrive setup</a>
         </div>
