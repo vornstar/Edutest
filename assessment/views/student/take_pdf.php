@@ -28,7 +28,13 @@ if (!$previewMode) {
     <div class="pdf-split">
         <div class="pdf-pane">
             <?php if ($previewMode): ?>
-                <iframe title="Exam paper" src="/assessment/files/papers/<?= (int) $paper['id'] ?>/paper" class="pdf-frame"></iframe>
+                <p class="autosave-status" id="preview-pdf-status">This is the paper as a student sees it - nothing here is interactive in preview mode.</p>
+                <div class="pdf-preview-tools">
+                    <button type="button" data-page-prev>&larr; Prev</button>
+                    <span data-page-indicator>Page 1</span>
+                    <button type="button" data-page-next>Next &rarr;</button>
+                </div>
+                <canvas id="preview-pdf-canvas" class="annotation-canvas" data-pdf-src="/assessment/files/papers/<?= (int) $paper['id'] ?>/paper"></canvas>
             <?php else: ?>
                 <h2>Type directly on the exam paper</h2>
                 <p class="autosave-status" id="pdf-answer-status">Autosaves as you type/draw.</p>
@@ -76,7 +82,10 @@ if (!$previewMode) {
         </div>
     </div>
 </div>
-<?php if (!$previewMode): ?>
+<?php if ($previewMode): ?>
+<script src="<?= asset_url('/assets/js/pdf-annotate-core.js') ?>"></script>
+<script src="<?= asset_url('/assets/js/preview-pdf.js') ?>"></script>
+<?php else: ?>
 <script>window.__existingStudentAnnotations = <?= json_encode($existingStudentAnnotations) ?>;</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 <script src="<?= asset_url('/assets/js/pdf-annotate-core.js') ?>"></script>
