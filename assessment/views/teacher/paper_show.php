@@ -5,6 +5,8 @@
 /** @var bool $canManage */
 /** @var array|null $selfTest */
 /** @var array|null $selfTestSubmission */
+/** @var array $groups */
+/** @var array|null $paperGroup */
 $__title = htmlspecialchars($paper['title']);
 require __DIR__ . '/../partials/header.php';
 ?>
@@ -39,6 +41,24 @@ require __DIR__ . '/../partials/header.php';
 
     <p>Type: <?= htmlspecialchars($paper['type']) ?> &middot; Status: <?= htmlspecialchars($paper['status']) ?></p>
     <p class="autosave-status">Self-marking is set per-assignment now, not per-paper - see the class page for each assignment once it's been assigned.</p>
+
+    <?php if ($canManage): ?>
+        <form method="post" action="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/group" style="display:flex;gap:0.5rem;align-items:flex-end;">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
+            <label>Group
+                <select name="group_id">
+                    <option value="">&mdash; none &mdash;</option>
+                    <?php foreach ($groups as $g): ?>
+                        <option value="<?= (int) $g['id'] ?>" <?= $paperGroup && (int) $paperGroup['id'] === (int) $g['id'] ? 'selected' : '' ?>><?= htmlspecialchars($g['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <label>Or a new group <input type="text" name="new_group_name" maxlength="128" placeholder="Leave blank to use the dropdown"></label>
+            <button type="submit" class="btn">Save</button>
+        </form>
+    <?php elseif ($paperGroup): ?>
+        <p>Group: <?= htmlspecialchars($paperGroup['name']) ?></p>
+    <?php endif; ?>
 
     <?php if ($paper['type'] === 'pdf' && $canManage): ?>
         <form method="post" action="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/max-marks" style="display:flex;gap:0.5rem;align-items:flex-end;">

@@ -1,5 +1,6 @@
 <?php
 /** @var array $subjects */
+/** @var array $groups */
 $__title = 'New paper';
 require __DIR__ . '/../partials/header.php';
 ?>
@@ -20,6 +21,17 @@ require __DIR__ . '/../partials/header.php';
         <?php if (!$subjects): ?>
             <p class="autosave-status">No subjects set up yet - an admin can add some in Admin &gt; Subjects.</p>
         <?php endif; ?>
+
+        <label>Group <span class="autosave-status">(optional - your own way of bundling related papers, e.g. by topic or course)</span>
+            <select name="group_id">
+                <option value="">&mdash; none &mdash;</option>
+                <?php foreach ($groups as $g): ?>
+                    <option value="<?= (int) $g['id'] ?>"><?= htmlspecialchars($g['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+        <label>Or create a new group <input type="text" name="new_group_name" maxlength="128" placeholder="Leave blank to use the dropdown above"></label>
+
         <label>Duration (minutes) <input type="number" name="duration_minutes" min="1"></label>
 
         <fieldset>

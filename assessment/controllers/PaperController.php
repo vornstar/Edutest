@@ -78,6 +78,8 @@ final class PaperController
     {
         $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         $papers = Paper::visibleTo($user);
+        require_once __DIR__ . '/../models/PaperGroup.php';
+        $groups = PaperGroup::all();
         require __DIR__ . '/../views/teacher/papers_index.php';
     }
 
@@ -85,7 +87,9 @@ final class PaperController
     {
         AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         require_once __DIR__ . '/../models/Subject.php';
+        require_once __DIR__ . '/../models/PaperGroup.php';
         $subjects = Subject::all();
+        $groups = PaperGroup::all();
         require __DIR__ . '/../views/teacher/paper_create.php';
     }
 
@@ -99,6 +103,7 @@ final class PaperController
         $paperId = Paper::create([
             'title' => trim((string) ($_POST['title'] ?? 'Untitled paper')),
             'subject' => trim((string) ($_POST['subject'] ?? '')) ?: null,
+            'group_id' => self::resolveGroupId($user),
             'type' => $type,
             'created_by' => $user['id'],
             'max_marks' => $type === 'pdf' && !empty($_POST['max_marks']) ? (float) $_POST['max_marks'] : null,
@@ -108,6 +113,43 @@ final class PaperController
         if ($type === 'pdf' && !empty($_FILES['paper_pdf']['tmp_name'])) {
             self::attachPdfUploads($paperId, (int) $user['id']);
         }
+
+        header('Location: /assessment/teacher/papers/' . $paperId);
+        exit;
+    }
+
+    /** A new group name (POST new_group_name) takes priority over the group_id dropdown - lets a teacher create-and-use a group in one step without a separate trip to manage groups first. */
+    private static function resolveGroupId(array $user): ?int
+    {
+        require_once __DIR__ . '/../models/PaperGroup.php';
+
+        $newGroupName = trim((string) ($_POST['new_group_name'] ?? ''));
+        if ($newGroupName !== '') {
+            try {
+                return PaperGroup::create($newGroupName, (int) $user['id']);
+            } catch (PDOException $e) {
+                // Duplicate name (uq_paper_group_name) - reuse the existing group of that name instead of failing the whole paper creation.
+                foreach (PaperGroup::all() as $g) {
+                    if (strcasecmp($g['name'], $newGroupName) === 0) {
+                        return (int) $g['id'];
+                    }
+                }
+                return null;
+            }
+        }
+
+        return !empty($_POST['group_id']) ? (int) $_POST['group_id'] : null;
+    }
+
+    /** Edits which group a paper belongs to at any time, e.g. after creating the group it should have been in from the start. */
+    public static function updateGroup(int $paperId): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        AuthController::verifyCsrf();
+        self::requireManageable($paperId, $user);
+
+        $groupId = self::resolveGroupId($user);
+        Paper::setGroup($paperId, $groupId);
 
         header('Location: /assessment/teacher/papers/' . $paperId);
         exit;
@@ -155,6 +197,9 @@ final class PaperController
         $canDelete = $canManage && !Paper::hasSubmissions($paperId);
         $selfTest = TestAssignment::findSelfTest($paperId, (int) $user['id']);
         $selfTestSubmission = $selfTest ? Submission::findByAssignmentAndStudent((int) $selfTest['id'], (int) $user['id']) : null;
+        require_once __DIR__ . '/../models/PaperGroup.php';
+        $groups = PaperGroup::all();
+        $paperGroup = $paper['group_id'] ? PaperGroup::find((int) $paper['group_id']) : null;
         require __DIR__ . '/../views/teacher/paper_show.php';
     }
 

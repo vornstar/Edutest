@@ -72,10 +72,26 @@ CREATE TABLE IF NOT EXISTS class_enrollments (
     CONSTRAINT fk_enroll_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- A teacher's own way of bundling related papers together - e.g. every test
+-- for one topic or course - distinct from Subject (a school-wide taxonomy
+-- driving visibility, managed via Admin > Subjects). Any teacher-portal
+-- user can create one, not just admins, since this is meant to be a
+-- lightweight organisational tool a teacher reaches for while creating a
+-- paper, not something that needs gatekeeping.
+CREATE TABLE IF NOT EXISTS paper_groups (
+    id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name       VARCHAR(128) NOT NULL,
+    created_by INT UNSIGNED NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_paper_group_name (name),
+    CONSTRAINT fk_paper_groups_creator FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS papers (
     id                       INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     title                    VARCHAR(255) NOT NULL,
     subject                  VARCHAR(128) NULL,
+    group_id                 INT UNSIGNED NULL COMMENT 'Optional - see paper_groups',
     type                     ENUM('digital','pdf') NOT NULL DEFAULT 'digital',
     created_by               INT UNSIGNED NOT NULL,
     pdf_drive_item_id        VARCHAR(255) NULL COMMENT 'OneDrive item id for the exam paper PDF',
@@ -86,7 +102,8 @@ CREATE TABLE IF NOT EXISTS papers (
     status                   ENUM('draft','published','archived') NOT NULL DEFAULT 'draft',
     created_at               DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at               DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_papers_creator FOREIGN KEY (created_by) REFERENCES users(id)
+    CONSTRAINT fk_papers_creator FOREIGN KEY (created_by) REFERENCES users(id),
+    CONSTRAINT fk_papers_group FOREIGN KEY (group_id) REFERENCES paper_groups(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS questions (

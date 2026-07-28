@@ -25,6 +25,7 @@ AuthController::bootSession();
 require_once __DIR__ . '/controllers/HomeController.php';
 require_once __DIR__ . '/controllers/StudentController.php';
 require_once __DIR__ . '/controllers/PaperController.php';
+require_once __DIR__ . '/controllers/PaperGroupController.php';
 require_once __DIR__ . '/controllers/TestController.php';
 require_once __DIR__ . '/controllers/TeamsController.php';
 require_once __DIR__ . '/controllers/MarkingController.php';
@@ -72,6 +73,11 @@ $routes = [
 
     // Teacher / Subject Leader portal
     ['GET', '/teacher', [PaperController::class, 'index']],
+    ['GET', '/teacher/groups', [PaperGroupController::class, 'index']],
+    ['POST', '/teacher/groups/add', [PaperGroupController::class, 'add']],
+    ['POST', '/teacher/groups/{id}/rename', [PaperGroupController::class, 'rename']],
+    ['POST', '/teacher/groups/{id}/delete', [PaperGroupController::class, 'delete']],
+
     ['GET', '/teacher/papers', [PaperController::class, 'index']],
     ['GET', '/teacher/papers/create', [PaperController::class, 'createForm']],
     ['POST', '/teacher/papers', [PaperController::class, 'store']],
@@ -80,6 +86,7 @@ $routes = [
     ['POST', '/teacher/papers/{id}/bulk-import', [PaperController::class, 'bulkImport']],
     ['POST', '/teacher/papers/{id}/publish', [PaperController::class, 'publish']],
     ['POST', '/teacher/papers/{id}/max-marks', [PaperController::class, 'updateMaxMarks']],
+    ['POST', '/teacher/papers/{id}/group', [PaperController::class, 'updateGroup']],
     ['POST', '/teacher/papers/{id}/update-pdf', [PaperController::class, 'updatePdf']],
     ['POST', '/teacher/papers/{id}/delete', [PaperController::class, 'destroy']],
     ['GET', '/teacher/papers/{id}/preview', [TestController::class, 'preview']],

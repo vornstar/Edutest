@@ -8,12 +8,13 @@ final class Paper
     public static function create(array $data): int
     {
         $stmt = Database::connection()->prepare(
-            'INSERT INTO papers (title, subject, type, created_by, pdf_drive_item_id, mark_scheme_drive_item_id, self_marking_enabled, max_marks, duration_minutes, status)
-             VALUES (:title, :subject, :type, :created_by, :pdf_drive_item_id, :mark_scheme_drive_item_id, :self_marking_enabled, :max_marks, :duration_minutes, :status)'
+            'INSERT INTO papers (title, subject, group_id, type, created_by, pdf_drive_item_id, mark_scheme_drive_item_id, self_marking_enabled, max_marks, duration_minutes, status)
+             VALUES (:title, :subject, :group_id, :type, :created_by, :pdf_drive_item_id, :mark_scheme_drive_item_id, :self_marking_enabled, :max_marks, :duration_minutes, :status)'
         );
         $stmt->execute([
             'title' => $data['title'],
             'subject' => $data['subject'] ?? null,
+            'group_id' => $data['group_id'] ?? null,
             'type' => $data['type'] ?? 'digital',
             'created_by' => $data['created_by'],
             'pdf_drive_item_id' => $data['pdf_drive_item_id'] ?? null,
@@ -30,6 +31,12 @@ final class Paper
     {
         $stmt = Database::connection()->prepare('UPDATE papers SET max_marks = :max_marks WHERE id = :id');
         $stmt->execute(['max_marks' => $maxMarks, 'id' => $paperId]);
+    }
+
+    public static function setGroup(int $paperId, ?int $groupId): void
+    {
+        $stmt = Database::connection()->prepare('UPDATE papers SET group_id = :group_id WHERE id = :id');
+        $stmt->execute(['group_id' => $groupId, 'id' => $paperId]);
     }
 
     public static function find(int $id): ?array
