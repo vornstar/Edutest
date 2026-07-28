@@ -32,22 +32,33 @@ require __DIR__ . '/../partials/header.php';
                 <td><?= htmlspecialchars($a['class_name']) ?></td>
                 <td><?= htmlspecialchars($a['due_at'] ?? '—') ?></td>
                 <td><?= (int) $p['started'] ?>/<?= (int) $p['roster'] ?> started &middot; <?= (int) $p['completed'] ?> submitted or further</td>
-                <td><?= $isClosed ? 'Closed (' . htmlspecialchars($a['closed_at']) . ')' : 'Open' ?></td>
-                <td><?= $gradesReleased ? 'Released' : 'Not released' ?></td>
                 <td>
-                    <form method="post" action="/assessment/teacher/assignments/<?= (int) $a['id'] ?>/<?= $isClosed ? 'reopen' : 'close' ?>" style="display:inline">
-                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
-                        <button type="submit" class="btn <?= $isClosed ? '' : 'btn-danger' ?>"><?= $isClosed ? 'Reopen' : 'Close now' ?></button>
-                    </form>
-                    <form method="post" action="/assessment/teacher/assignments/<?= (int) $a['id'] ?>/<?= $gradesReleased ? 'unrelease-grades' : 'release-grades' ?>" style="display:inline">
-                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
-                        <button type="submit" class="btn"><?= $gradesReleased ? 'Unrelease grades' : 'Release grades' ?></button>
-                    </form>
-                    <a class="btn" href="/assessment/teacher/papers/<?= (int) $a['paper_id'] ?>/results">Results</a>
-                    <form method="post" action="/assessment/teacher/assignments/<?= (int) $a['id'] ?>/cancel" style="display:inline" onsubmit="return confirm('Cancel this test? It will disappear from students\' lists and be removed from Teams if it was pushed there. Nothing is deleted - you can restore it from Deleted tests.');">
-                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
-                        <button type="submit" class="btn btn-danger">Cancel test</button>
-                    </form>
+                    <?php if ($isClosed): ?>
+                        <span class="badge badge-neutral" title="Closed <?= htmlspecialchars($a['closed_at']) ?>">Closed</span>
+                    <?php else: ?>
+                        <span class="badge badge-positive">Open</span>
+                    <?php endif; ?>
+                </td>
+                <td><span class="badge <?= $gradesReleased ? 'badge-positive' : 'badge-neutral' ?>"><?= $gradesReleased ? 'Released' : 'Not released' ?></span></td>
+                <td>
+                    <details class="actions-dropdown">
+                        <summary class="btn">Actions</summary>
+                        <div class="actions-menu">
+                            <a class="btn" href="/assessment/teacher/papers/<?= (int) $a['paper_id'] ?>/results">Results</a>
+                            <form method="post" action="/assessment/teacher/assignments/<?= (int) $a['id'] ?>/<?= $isClosed ? 'reopen' : 'close' ?>">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
+                                <button type="submit" class="btn"><?= $isClosed ? 'Reopen' : 'Close now' ?></button>
+                            </form>
+                            <form method="post" action="/assessment/teacher/assignments/<?= (int) $a['id'] ?>/<?= $gradesReleased ? 'unrelease-grades' : 'release-grades' ?>">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
+                                <button type="submit" class="btn"><?= $gradesReleased ? 'Unrelease grades' : 'Release grades' ?></button>
+                            </form>
+                            <form method="post" action="/assessment/teacher/assignments/<?= (int) $a['id'] ?>/cancel" onsubmit="return confirm('Cancel this test? It will disappear from students\' lists and be removed from Teams if it was pushed there. Nothing is deleted - you can restore it from Deleted tests.');">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
+                                <button type="submit" class="btn btn-danger">Cancel test</button>
+                            </form>
+                        </div>
+                    </details>
                 </td>
             </tr>
         <?php endforeach; ?>

@@ -130,6 +130,44 @@ input[type="file"], select, textarea {
 .data-table th, .data-table td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--color-border); font-size: 0.9rem; }
 .data-table thead th { color: var(--color-muted); font-weight: 600; }
 
+/* A small coloured pill for scannable at-a-glance state (open/closed, released/not) -
+   quieter than a full-width coloured button, so it reads as status, not as an action. */
+.badge {
+    display: inline-block;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.badge-positive { background: #e6f4ea; color: #1e7b34; }
+.badge-neutral { background: var(--color-bg); color: var(--color-muted); }
+
+/* A single "Actions" trigger that opens a dropdown of buttons, instead of stacking every
+   action button directly in a table cell (which wraps messily once there are more than
+   two or three). Built on the same <details>/<summary> pattern as the nav dropdowns. */
+.actions-dropdown { position: relative; display: inline-block; }
+.actions-dropdown > summary { list-style: none; cursor: pointer; }
+.actions-dropdown > summary::-webkit-details-marker { display: none; }
+.actions-dropdown > summary.btn::after { content: " \25BE"; margin-left: 0.35rem; }
+.actions-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.35rem);
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 11rem;
+    padding: 0.5rem;
+    background: var(--color-panel);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+.actions-menu form { margin: 0; }
+.actions-menu .btn { display: block; width: 100%; box-sizing: border-box; text-align: center; }
+
 .question-block { border: 1px solid var(--color-border); border-radius: 6px; padding: 1rem; margin: 1rem 0; }
 .mark-scheme { background: #fff7e6; padding: 0.5rem; border-radius: 4px; }
 .self-mark-note { color: var(--color-self-marking); font-style: italic; }
