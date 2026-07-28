@@ -54,8 +54,9 @@ final class Moderation
         $stmt = Database::connection()->prepare(
             'SELECT ma.*, s.assignment_id, u.display_name_cipher AS student_name_cipher FROM moderation_assignments ma
              INNER JOIN submissions s ON s.id = ma.submission_id
+             INNER JOIN test_assignments a ON a.id = s.assignment_id
              INNER JOIN users u ON u.id = s.student_id
-             WHERE ma.secondary_marker_id = :user_id ORDER BY ma.created_at DESC'
+             WHERE ma.secondary_marker_id = :user_id AND a.cancelled_at IS NULL ORDER BY ma.created_at DESC'
         );
         $stmt->execute(['user_id' => $userId]);
         return array_map(static function (array $row): array {
@@ -107,7 +108,8 @@ final class Moderation
         $stmt = Database::connection()->query(
             "SELECT ma.*, s.assignment_id FROM moderation_assignments ma
              INNER JOIN submissions s ON s.id = ma.submission_id
-             WHERE ma.status = 'flagged' ORDER BY ma.completed_at DESC"
+             INNER JOIN test_assignments a ON a.id = s.assignment_id
+             WHERE ma.status = 'flagged' AND a.cancelled_at IS NULL ORDER BY ma.completed_at DESC"
         );
         return $stmt->fetchAll();
     }

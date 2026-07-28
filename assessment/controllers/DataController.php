@@ -22,13 +22,15 @@ final class DataController
         $pdo = Database::connection();
 
         $byStatus = $pdo->query(
-            'SELECT status, COUNT(*) AS total FROM submissions GROUP BY status'
+            'SELECT s.status, COUNT(*) AS total FROM submissions s
+             INNER JOIN test_assignments a ON a.id = s.assignment_id
+             WHERE a.cancelled_at IS NULL GROUP BY s.status'
         )->fetchAll();
 
         $byPaper = $pdo->query(
             'SELECT p.title, p.subject, COUNT(s.id) AS submissions, AVG(scores.total) AS avg_score
              FROM papers p
-             LEFT JOIN test_assignments a ON a.paper_id = p.id
+             LEFT JOIN test_assignments a ON a.paper_id = p.id AND a.cancelled_at IS NULL
              LEFT JOIN submissions s ON s.assignment_id = a.id
              LEFT JOIN (
                  SELECT submission_id, SUM(score) AS total FROM (
@@ -44,8 +46,10 @@ final class DataController
         )->fetchAll();
 
         $moderationVariance = $pdo->query(
-            "SELECT status, COUNT(*) AS total, AVG(variance) AS avg_variance FROM moderation_assignments
-             WHERE variance IS NOT NULL GROUP BY status"
+            "SELECT ma.status, COUNT(*) AS total, AVG(ma.variance) AS avg_variance FROM moderation_assignments ma
+             INNER JOIN submissions s ON s.id = ma.submission_id
+             INNER JOIN test_assignments a ON a.id = s.assignment_id
+             WHERE ma.variance IS NOT NULL AND a.cancelled_at IS NULL GROUP BY ma.status"
         )->fetchAll();
 
         require __DIR__ . '/../views/data/dashboard.php';

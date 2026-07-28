@@ -22,7 +22,7 @@ require __DIR__ . '/../partials/header.php';
                  INNER JOIN test_assignments a ON a.id = s.assignment_id
                  INNER JOIN users u ON u.id = s.student_id
                  INNER JOIN papers p ON p.id = a.paper_id
-                 WHERE p.id = :paper_id AND s.status IN ("submitted", "pending_moderation")
+                 WHERE p.id = :paper_id AND s.status IN ("submitted", "pending_moderation") AND a.cancelled_at IS NULL
                  ORDER BY s.submitted_at'
             );
             $stmt->execute(['paper_id' => $paper['id']]);

@@ -54,13 +54,13 @@ final class TestAssignment
         $stmt->execute(['enabled' => $enabled ? 1 : 0, 'id' => $id]);
     }
 
-    /** Every real (non-self-test) assignment of this paper, across every class it's been assigned to - used by the Results page. */
+    /** Every real (non-self-test), non-cancelled assignment of this paper, across every class it's been assigned to - used by the Results page and institution reports. */
     public static function forPaper(int $paperId): array
     {
         $stmt = Database::connection()->prepare(
             'SELECT a.*, c.name AS class_name FROM test_assignments a
              INNER JOIN classes c ON c.id = a.class_id
-             WHERE a.paper_id = :paper_id ORDER BY a.created_at DESC'
+             WHERE a.paper_id = :paper_id AND a.cancelled_at IS NULL ORDER BY a.created_at DESC'
         );
         $stmt->execute(['paper_id' => $paperId]);
         return $stmt->fetchAll();
@@ -141,12 +141,13 @@ final class TestAssignment
         return $stmt->fetchAll();
     }
 
+    /** Every non-cancelled assignment for this class - used by the class page's "Assigned tests" list. */
     public static function forClass(int $classId): array
     {
         $stmt = Database::connection()->prepare(
             'SELECT a.*, p.title, p.type FROM test_assignments a
              INNER JOIN papers p ON p.id = a.paper_id
-             WHERE a.class_id = :class_id ORDER BY a.created_at DESC'
+             WHERE a.class_id = :class_id AND a.cancelled_at IS NULL ORDER BY a.created_at DESC'
         );
         $stmt->execute(['class_id' => $classId]);
         return $stmt->fetchAll();

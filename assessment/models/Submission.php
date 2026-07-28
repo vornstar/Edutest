@@ -142,6 +142,7 @@ final class Submission
             'SELECT s.id FROM submissions s
              INNER JOIN test_assignments a ON a.id = s.assignment_id
              WHERE a.paper_id = :paper_id AND s.id != :current_id AND s.status IN ("submitted", "pending_moderation")
+             AND a.cancelled_at IS NULL
              ORDER BY s.submitted_at ASC LIMIT 1'
         );
         $stmt->execute(['paper_id' => $paperId, 'current_id' => $currentSubmissionId]);
