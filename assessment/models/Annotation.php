@@ -38,17 +38,20 @@ final class Annotation
      */
     public static function forSubmission(int $submissionId): array
     {
+        // Real (non-emulated) prepared statements reject the same named
+        // placeholder appearing twice in one query - :submission_id needs a
+        // distinct name at each occurrence, both bound to the same value.
         $stmt = Database::connection()->prepare(
             'SELECT a.* FROM annotations a
              INNER JOIN (
                  SELECT page_number, marker_id, MAX(version) AS max_version
-                 FROM annotations WHERE submission_id = :submission_id
+                 FROM annotations WHERE submission_id = :submission_id_1
                  GROUP BY page_number, marker_id
              ) latest ON latest.page_number = a.page_number AND latest.marker_id = a.marker_id AND latest.max_version = a.version
-             WHERE a.submission_id = :submission_id
+             WHERE a.submission_id = :submission_id_2
              ORDER BY a.page_number, a.marker_id'
         );
-        $stmt->execute(['submission_id' => $submissionId]);
+        $stmt->execute(['submission_id_1' => $submissionId, 'submission_id_2' => $submissionId]);
         return self::decryptAll($stmt->fetchAll());
     }
 
