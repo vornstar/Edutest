@@ -127,6 +127,22 @@ final class OneDriveService
     }
 
     /**
+     * Uploads the school logo into {root}/Branding/ - a small, non-sensitive,
+     * publicly-brandable image (not student data), but still goes through
+     * OneDrive rather than local disk to match this app's storage model and
+     * avoid shared-hosting file-permission issues that made the earlier
+     * local-upload version unreliable (see AdminController::updateBranding).
+     */
+    public function uploadBrandingLogo(string $filename, string $binaryContent, string $contentType): string
+    {
+        $folderId = $this->ensurePath(array_merge($this->rootFolderSegments(), ['Branding']));
+        $root = $this->resolveMasterFolder();
+        $path = "/drives/{$root['driveId']}/items/{$folderId}:/" . rawurlencode($filename) . ':/content';
+        $result = $this->graph->putBinary($path, $binaryContent, $contentType);
+        return (string) $result['id'];
+    }
+
+    /**
      * Uploads a scanned student script using the required folder convention:
      * {root}/{PaperID}/{StudentID}.pdf
      */

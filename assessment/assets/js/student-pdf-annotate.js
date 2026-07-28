@@ -19,11 +19,14 @@
 (function () {
     'use strict';
 
-    var STUDENT_COLOR = '#1d4ed8';
     var PLACEHOLDER_TEXT = 'Type here';
 
     var canvasEl = document.getElementById('pdf-answer-canvas');
     if (!canvasEl || typeof fabric === 'undefined' || !window.PdfAnnotateCore) return;
+
+    // Set by the page itself from the school's branding (Admin > Branding),
+    // falling back to the platform default if unset - see take_pdf.php.
+    var STUDENT_COLOR = window.__studentWorkColor || '#1d4ed8';
 
     var panel = document.querySelector('.test-panel');
     var submissionId = panel.dataset.submissionId;

@@ -14,7 +14,7 @@ $__branding = Branding::get();
 <title><?= htmlspecialchars($__title) ?></title>
 <link rel="stylesheet" href="<?= asset_url('/assets/css/style.css') ?>">
 <script src="<?= asset_url('/assets/js/nav.js') ?>" defer></script>
-<?php if ($__branding['primary_color'] || $__branding['accent_color']): ?>
+<?php if ($__branding['primary_color'] || $__branding['accent_color'] || $__branding['self_marking_color']): ?>
 <style>
 :root {
 <?php if ($__branding['primary_color']): ?>
@@ -23,6 +23,9 @@ $__branding = Branding::get();
 <?php if ($__branding['accent_color']): ?>
     --color-accent: <?= htmlspecialchars($__branding['accent_color']) ?>;
 <?php endif; ?>
+<?php if ($__branding['self_marking_color']): ?>
+    --color-self-marking: <?= htmlspecialchars($__branding['self_marking_color']) ?>;
+<?php endif; ?>
 }
 </style>
 <?php endif; ?>
@@ -30,8 +33,8 @@ $__branding = Branding::get();
 <body>
 <header class="app-header<?= $__branding['accent_color'] ? ' has-accent' : '' ?>">
     <a class="brand" href="/assessment/">
-        <?php if ($__branding['logo_filename']): ?>
-            <img class="brand-logo" src="<?= htmlspecialchars(asset_url('/assets/uploads/branding/' . $__branding['logo_filename'])) ?>" alt="<?= htmlspecialchars($__branding['school_name']) ?>">
+        <?php if ($__branding['logo_drive_item_id']): ?>
+            <img class="brand-logo" src="/assessment/files/branding/logo?v=<?= urlencode((string) ($__branding['updated_at'] ?? '')) ?>" alt="<?= htmlspecialchars($__branding['school_name']) ?>">
         <?php else: ?>
             <?= htmlspecialchars($__branding['school_name']) ?>
         <?php endif; ?>

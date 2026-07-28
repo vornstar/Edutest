@@ -7,6 +7,7 @@ require_once __DIR__ . '/../models/Submission.php';
 require_once __DIR__ . '/../models/TestAssignment.php';
 require_once __DIR__ . '/../models/ClassRoster.php';
 require_once __DIR__ . '/../models/User.php';
+require_once __DIR__ . '/../models/Branding.php';
 require_once __DIR__ . '/../services/OneDriveService.php';
 
 /**
@@ -106,7 +107,32 @@ final class FileProxyController
         self::stream((int) $user['id'], (string) $submission['scan_drive_item_id'], 'script.pdf');
     }
 
-    private static function stream(int $actingUserId, string $driveItemId, string $downloadName): void
+    /**
+     * The school's logo (see Admin > Branding / OneDriveService::
+     * uploadBrandingLogo) - shown in the header on every page, so unlike
+     * every other file here this is cached aggressively (a school's logo
+     * essentially never changes) rather than no-store, and any signed-in
+     * user can fetch it, not just staff - it's not student data.
+     */
+    public static function brandingLogo(): void
+    {
+        $user = AuthController::requireLogin();
+        $branding = Branding::get();
+        if (!$branding['logo_drive_item_id']) {
+            http_response_code(404);
+            exit;
+        }
+
+        self::stream(
+            (int) $user['id'],
+            (string) $branding['logo_drive_item_id'],
+            'logo',
+            (string) ($branding['logo_content_type'] ?? 'application/octet-stream'),
+            'private, max-age=86400'
+        );
+    }
+
+    private static function stream(int $actingUserId, string $driveItemId, string $downloadName, string $contentType = 'application/pdf', string $cacheControl = 'private, max-age=0, no-store'): void
     {
         $drive = new OneDriveService($actingUserId);
         try {
@@ -117,10 +143,10 @@ final class FileProxyController
             return;
         }
 
-        header('Content-Type: application/pdf');
+        header('Content-Type: ' . $contentType);
         header('Content-Disposition: inline; filename="' . $downloadName . '"');
         header('X-Content-Type-Options: nosniff');
-        header('Cache-Control: private, max-age=0, no-store');
+        header('Cache-Control: ' . $cacheControl);
         echo $bytes;
     }
 }

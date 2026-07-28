@@ -8,6 +8,7 @@
     --color-primary-contrast: #ffffff;
     --color-accent: var(--color-primary);
     --color-danger: #b3261e;
+    --color-self-marking: #16a34a;
     --radius: 8px;
 }
 
@@ -131,7 +132,7 @@ input[type="file"], select, textarea {
 
 .question-block { border: 1px solid var(--color-border); border-radius: 6px; padding: 1rem; margin: 1rem 0; }
 .mark-scheme { background: #fff7e6; padding: 0.5rem; border-radius: 4px; }
-.self-mark-note { color: var(--color-muted); font-style: italic; }
+.self-mark-note { color: var(--color-self-marking); font-style: italic; }
 
 .autosave-status { color: var(--color-muted); font-size: 0.85rem; }
 

@@ -188,7 +188,7 @@ final class AdminController
     /** School name, brand colours, and (optionally) a logo - see Branding model and views/admin/branding.php. */
     public static function updateBranding(): void
     {
-        AuthController::requireRole([User::ROLE_ADMIN]);
+        $user = AuthController::requireRole([User::ROLE_ADMIN]);
         AuthController::verifyCsrf();
 
         $current = Branding::get();
@@ -198,28 +198,40 @@ final class AdminController
         // let a school explicitly go back to the platform default rather than just picking colours.
         $primaryColor = !empty($_POST['reset_primary_color']) ? null : self::normalizeHexColor((string) ($_POST['primary_color'] ?? ''));
         $accentColor = !empty($_POST['reset_accent_color']) ? null : self::normalizeHexColor((string) ($_POST['accent_color'] ?? ''));
+        $studentWorkColor = !empty($_POST['reset_student_work_color']) ? null : self::normalizeHexColor((string) ($_POST['student_work_color'] ?? ''));
+        $teacherMarkingColor = !empty($_POST['reset_teacher_marking_color']) ? null : self::normalizeHexColor((string) ($_POST['teacher_marking_color'] ?? ''));
+        $teacherModerationColor = !empty($_POST['reset_teacher_moderation_color']) ? null : self::normalizeHexColor((string) ($_POST['teacher_moderation_color'] ?? ''));
+        $selfMarkingColor = !empty($_POST['reset_self_marking_color']) ? null : self::normalizeHexColor((string) ($_POST['self_marking_color'] ?? ''));
 
-        $logoFilename = $current['logo_filename'];
+        $logoDriveItemId = $current['logo_drive_item_id'];
+        $logoContentType = $current['logo_content_type'];
         if (!empty($_FILES['logo']['tmp_name']) && is_uploaded_file($_FILES['logo']['tmp_name'])) {
-            $logoFilename = self::storeLogoUpload($_FILES['logo']);
+            [$logoDriveItemId, $logoContentType] = self::storeLogoUpload($_FILES['logo'], (int) $user['id']);
         } elseif (!empty($_POST['remove_logo'])) {
-            self::deleteLogoFile($logoFilename);
-            $logoFilename = null;
+            // The old OneDrive file is left in place (same as replacing a paper's PDF elsewhere in
+            // this app never deletes the previous version) - only the reference is cleared.
+            $logoDriveItemId = null;
+            $logoContentType = null;
         }
 
-        Branding::save($schoolName, $logoFilename, $primaryColor, $accentColor);
+        Branding::save(
+            $schoolName,
+            $logoDriveItemId,
+            $logoContentType,
+            $primaryColor,
+            $accentColor,
+            $studentWorkColor,
+            $teacherMarkingColor,
+            $teacherModerationColor,
+            $selfMarkingColor
+        );
 
         header('Location: /assessment/admin/branding');
         exit;
     }
 
-    private static function logoDir(): string
-    {
-        return ASSESSMENT_ROOT . '/assets/uploads/branding';
-    }
-
-    /** Saves the upload as logo.<ext> (clearing any previous logo.* first, in case the extension changed), so old references never need updating and there's never more than one file sitting around. */
-    private static function storeLogoUpload(array $file): string
+    /** @return array{0:string,1:string} [driveItemId, contentType] */
+    private static function storeLogoUpload(array $file, int $actingUserId): array
     {
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
         $mime = finfo_file($finfo, $file['tmp_name']);
@@ -232,31 +244,11 @@ final class AdminController
             exit;
         }
 
-        $dir = self::logoDir();
-        if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
-            http_response_code(500);
-            echo 'Could not create the upload directory.';
-            exit;
-        }
-        foreach (glob($dir . '/logo.*') ?: [] as $existing) {
-            @unlink($existing);
-        }
+        $content = file_get_contents($file['tmp_name']);
+        $drive = new OneDriveService($actingUserId);
+        $itemId = $drive->uploadBrandingLogo('logo.' . $ext, $content, $mime);
 
-        $filename = 'logo.' . $ext;
-        if (!move_uploaded_file($file['tmp_name'], $dir . '/' . $filename)) {
-            http_response_code(500);
-            echo 'Failed to save the uploaded logo.';
-            exit;
-        }
-
-        return $filename;
-    }
-
-    private static function deleteLogoFile(?string $filename): void
-    {
-        if ($filename) {
-            @unlink(self::logoDir() . '/' . $filename);
-        }
+        return [$itemId, $mime];
     }
 
     private static function normalizeHexColor(string $value): ?string

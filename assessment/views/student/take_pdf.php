@@ -86,7 +86,10 @@ if (!$previewMode) {
 <script src="<?= asset_url('/assets/js/pdf-annotate-core.js') ?>"></script>
 <script src="<?= asset_url('/assets/js/preview-pdf.js') ?>"></script>
 <?php else: ?>
-<script>window.__existingStudentAnnotations = <?= json_encode($existingStudentAnnotations) ?>;</script>
+<script>
+window.__existingStudentAnnotations = <?= json_encode($existingStudentAnnotations) ?>;
+window.__studentWorkColor = <?= json_encode($__branding['student_work_color'] ?? Branding::DEFAULT_STUDENT_WORK_COLOR) ?>;
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 <script src="<?= asset_url('/assets/js/pdf-annotate-core.js') ?>"></script>
 <script src="<?= asset_url('/assets/js/student-pdf-annotate.js') ?>"></script>

@@ -143,6 +143,7 @@ $routes = [
     // File streaming proxy (never exposes raw OneDrive URLs)
     ['GET', '/files/papers/{id}/{kind}', [FileProxyController::class, 'paperPdf']],
     ['GET', '/files/scans/{id}', [FileProxyController::class, 'scannedScript']],
+    ['GET', '/files/branding/logo', [FileProxyController::class, 'brandingLogo']],
 
     // Data (read-only reporting)
     ['GET', '/data', [DataController::class, 'dashboard']],

@@ -265,12 +265,17 @@ CREATE TABLE IF NOT EXISTS custom_stamps (
 -- deployment-wide (one school per deployment, per the OneDrive/Graph
 -- tenant model everything else here already assumes), not per-user.
 CREATE TABLE IF NOT EXISTS branding (
-    id            TINYINT UNSIGNED NOT NULL PRIMARY KEY,
-    school_name   VARCHAR(255) NOT NULL DEFAULT 'Assessment Platform',
-    logo_filename VARCHAR(255) NULL COMMENT 'Filename only (not a path), under assets/uploads/branding/ - NULL = no logo uploaded, the header shows school_name as text instead.',
-    primary_color CHAR(7) NULL COMMENT 'Hex e.g. #2952e3 - overrides --color-primary (buttons, links, brand text). NULL = platform default.',
-    accent_color  CHAR(7) NULL COMMENT 'Hex e.g. #b3261e - overrides --color-accent (a secondary highlight, e.g. the header underline). NULL = platform default.',
-    updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    id                        TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+    school_name               VARCHAR(255) NOT NULL DEFAULT 'Assessment Platform',
+    logo_drive_item_id        VARCHAR(255) NULL COMMENT 'OneDrive item id for the school logo (see OneDriveService::uploadBrandingLogo), served via /assessment/files/branding/logo - NULL = no logo uploaded, the header shows school_name as text instead. Same OneDrive-backed storage as every other file in this app - not a local upload, so it works the same on any host regardless of local filesystem write permissions.',
+    logo_content_type         VARCHAR(50) NULL COMMENT 'MIME type of the uploaded logo (image/png, image/jpeg, image/webp) - needed to serve it with the right Content-Type without an extra Graph metadata lookup on every page load.',
+    primary_color             CHAR(7) NULL COMMENT 'Hex e.g. #2952e3 - overrides --color-primary (buttons, links, brand text). NULL = platform default.',
+    accent_color              CHAR(7) NULL COMMENT 'Hex e.g. #b3261e - overrides --color-accent (a secondary highlight, e.g. the header underline). NULL = platform default.',
+    student_work_color        CHAR(7) NULL COMMENT 'Canvas ink colour for a student''s own typing/annotation on a pdf-type paper, shown to the student themselves and as the read-only reference layer on marking/moderation. NULL = platform default (#1d4ed8).',
+    teacher_marking_color     CHAR(7) NULL COMMENT 'Default canvas ink colour on the primary marking screen (still changeable per-session via the colour picker there). NULL = platform default (#e11d48).',
+    teacher_moderation_color  CHAR(7) NULL COMMENT 'Default canvas ink colour on the moderation screen. NULL = platform default (#059669).',
+    self_marking_color        CHAR(7) NULL COMMENT 'Text colour for a student''s self-mark/reflection notes, shown to markers alongside their own marking. NULL = platform default (#16a34a).',
+    updated_at                DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS audit_log (
