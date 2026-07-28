@@ -260,20 +260,22 @@ CREATE TABLE IF NOT EXISTS custom_stamps (
     CONSTRAINT fk_custom_stamps_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- A marker's own keyboard shortcut per stamp - covers both the built-in
--- stamps (Tick/Cross/SEEN/NE/LC/BOD, matched by their fixed label - see
--- partials/stamp_toolbar.php) and their own custom_stamps (matched by
--- label there too), uniformly, without needing to touch custom_stamps
--- itself. Two unique constraints keep the mapping unambiguous per user:
--- one stamp has at most one key, and one key triggers at most one stamp -
--- see StampShortcut::set(), which reassigns rather than erroring if a key
--- is already in use by a different stamp.
+-- A marker's own keyboard shortcut per stamp OR per annotation tool
+-- (Pen/Highlighter/Text/Circle/Delete) - target_type tells the two apart.
+-- Covers the built-in stamps (Tick/Cross/SEEN/NE/LC/BOD, matched by their
+-- fixed label - see partials/stamp_toolbar.php) and their own custom_stamps
+-- (matched by label there too), uniformly, without needing to touch
+-- custom_stamps itself. Two unique constraints keep the mapping unambiguous
+-- per user: one stamp/tool has at most one key, and one key triggers at
+-- most one thing - see StampShortcut::set(), which reassigns rather than
+-- erroring if a key is already in use by something else.
 CREATE TABLE IF NOT EXISTS stamp_shortcuts (
     id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     user_id      INT UNSIGNED NOT NULL,
+    target_type  ENUM('tool','stamp') NOT NULL DEFAULT 'stamp' COMMENT 'Whether stamp_label identifies a toolbar tool (pen/highlighter/text/circle/delete) or a stamp (built-in or custom) - see StampShortcut.',
     stamp_label  VARCHAR(20) NOT NULL,
-    shortcut_key CHAR(1) NOT NULL COMMENT 'A single keyboard character (case-insensitive) that arms this stamp while marking/moderating - see canvas-annotate.js',
-    UNIQUE KEY uq_stamp_shortcuts_label (user_id, stamp_label),
+    shortcut_key CHAR(1) NOT NULL COMMENT 'A single keyboard character (case-insensitive) that arms this stamp/tool while marking/moderating - see canvas-annotate.js',
+    UNIQUE KEY uq_stamp_shortcuts_label (user_id, target_type, stamp_label),
     UNIQUE KEY uq_stamp_shortcuts_key (user_id, shortcut_key),
     CONSTRAINT fk_stamp_shortcuts_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;

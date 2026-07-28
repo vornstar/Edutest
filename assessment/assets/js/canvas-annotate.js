@@ -116,12 +116,14 @@
     });
 
     /**
-     * Keyboard shortcuts for stamps (see partials/stamp_toolbar.php's "Manage stamps" -
-     * shortcuts are per-marker, built-in and custom stamps alike). Arms the matching stamp
-     * tool exactly as clicking its button would - the next click on the script still places
-     * it, this just saves reaching for the mouse first. Registered once, like the delete-key
-     * handler above - queries the DOM fresh on every keypress rather than caching button
-     * references, so it keeps working across renderPage()'s per-page rebuilds.
+     * Keyboard shortcuts for both stamps and tools (see partials/stamp_toolbar.php's
+     * "Keyboard shortcuts" dropdown - shortcuts are per-marker, and cover the
+     * Pen/Highlighter/Text/Circle/Delete buttons as well as built-in and custom stamps).
+     * Just clicks whichever button carries the matching data-shortcut - wireTools()
+     * already gives every tool/stamp button the right onclick, so this needs no
+     * per-tool special-casing. Registered once, like the delete-key handler above -
+     * queries the DOM fresh on every keypress rather than caching button references,
+     * so it keeps working across renderPage()'s per-page rebuilds.
      */
     document.addEventListener('keydown', function (e) {
         if (!fabricCanvas || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -131,7 +133,7 @@
         var activeObj = fabricCanvas.getActiveObject();
         if (activeObj && activeObj.isEditing) return;
 
-        var btn = document.querySelector('[data-tool="stamp"][data-shortcut="' + e.key.toLowerCase() + '"]');
+        var btn = document.querySelector('[data-shortcut="' + e.key.toLowerCase() + '"]');
         if (btn) {
             e.preventDefault();
             btn.click();

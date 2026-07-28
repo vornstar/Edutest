@@ -9,16 +9,17 @@ require_once __DIR__ . '/../models/StampShortcut.php';
 /** Per-marker custom quick-stamps for marking (SRS 7.1) - see CustomStamp model. */
 final class StampController
 {
-    /** Sets or clears (empty key) a keyboard shortcut for one stamp - built-in or custom, matched by label, see StampShortcut. */
+    /** Sets or clears (empty key) a keyboard shortcut for one stamp or annotation tool - see StampShortcut. */
     public static function setShortcut(): void
     {
         $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
         AuthController::verifyCsrf();
 
+        $targetType = ($_POST['target_type'] ?? '') === StampShortcut::TARGET_TOOL ? StampShortcut::TARGET_TOOL : StampShortcut::TARGET_STAMP;
         $label = trim((string) ($_POST['stamp_label'] ?? ''));
         $key = trim((string) ($_POST['shortcut_key'] ?? ''));
         if ($label !== '') {
-            StampShortcut::set((int) $user['id'], $label, $key);
+            StampShortcut::set((int) $user['id'], $targetType, $label, $key);
         }
 
         self::redirectBack();

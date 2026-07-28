@@ -19,6 +19,18 @@ require __DIR__ . '/../partials/header.php';
 // must key off whether a scan actually exists, not the paper's nominal type.
 $hasScanOrPdf = $paper['type'] === 'pdf' || !empty($submission['scan_drive_item_id']);
 $hasTypedAnswers = $paper['type'] === 'digital' && empty($submission['scan_drive_item_id']);
+
+/** Renders one annotation-tool button, adding this marker's own keyboard shortcut (see StampShortcut) if they've set one. */
+$__toolBtn = static function (string $tool, string $label, ?string $baseTitle = null) use ($shortcuts): string {
+    $key = $shortcuts['tool'][$tool] ?? null;
+    $title = $baseTitle ?? $label;
+    if ($key) {
+        $title .= ' (shortcut: ' . strtoupper($key) . ')';
+    }
+    return '<button type="button" data-tool="' . htmlspecialchars($tool) . '"'
+        . ($key ? ' data-shortcut="' . htmlspecialchars($key) . '"' : '')
+        . ' title="' . htmlspecialchars($title) . '">' . htmlspecialchars($label) . '</button>';
+};
 ?>
 <div class="panel marking-panel" data-submission-id="<?= (int) $submission['id'] ?>" data-csrf="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
     <h1><?= htmlspecialchars($paper['title']) ?> &mdash; <?= htmlspecialchars(ucfirst($moderation['mode'])) ?> moderation</h1>
@@ -35,11 +47,11 @@ $hasTypedAnswers = $paper['type'] === 'digital' && empty($submission['scan_drive
                 <p class="autosave-status">The student's own typing/writing on the PDF (if any) shows read-only in blue-ish tones on top - your marks go underneath, in whatever colour you pick below.</p>
             <?php endif; ?>
             <div class="annotation-tools">
-                <button type="button" data-tool="pen">Pen</button>
-                <button type="button" data-tool="highlighter">Highlighter</button>
-                <button type="button" data-tool="text">Text</button>
-                <button type="button" data-tool="circle" title="Drag to circle a mark - or just click for a default-sized circle">Circle</button>
-                <button type="button" data-tool="delete">Delete selected</button>
+                <?= $__toolBtn('pen', 'Pen') ?>
+                <?= $__toolBtn('highlighter', 'Highlighter') ?>
+                <?= $__toolBtn('text', 'Text') ?>
+                <?= $__toolBtn('circle', 'Circle', 'Drag to circle a mark - or just click for a default-sized circle') ?>
+                <?= $__toolBtn('delete', 'Delete selected') ?>
                 <input type="color" data-tool="color" value="<?= htmlspecialchars($__branding['teacher_moderation_color'] ?? Branding::DEFAULT_TEACHER_MODERATION_COLOR) ?>">
                 <?php require __DIR__ . '/../partials/stamp_toolbar.php'; ?>
                 <button type="button" id="save-annotation">Save annotations</button>
