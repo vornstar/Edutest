@@ -9,6 +9,7 @@
 /** @var array $markSchemes */
 /** @var array $annotations */
 /** @var array $customStamps each: ['id' => int, 'label' => string] */
+/** @var array $shortcuts stamp_label => shortcut key, this marker's own */
 /** @var string|null $currentGrade live-preview grade from your own moderation marks saved so far, or null if this paper has no grade boundaries (or no max marks set) */
 $__title = 'Moderation review';
 require __DIR__ . '/../partials/header.php';

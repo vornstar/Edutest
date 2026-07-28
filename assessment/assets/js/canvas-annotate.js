@@ -111,6 +111,29 @@
         deleteSelected();
     });
 
+    /**
+     * Keyboard shortcuts for stamps (see partials/stamp_toolbar.php's "Manage stamps" -
+     * shortcuts are per-marker, built-in and custom stamps alike). Arms the matching stamp
+     * tool exactly as clicking its button would - the next click on the script still places
+     * it, this just saves reaching for the mouse first. Registered once, like the delete-key
+     * handler above - queries the DOM fresh on every keypress rather than caching button
+     * references, so it keeps working across renderPage()'s per-page rebuilds.
+     */
+    document.addEventListener('keydown', function (e) {
+        if (!fabricCanvas || e.ctrlKey || e.metaKey || e.altKey) return;
+        var activeEl = document.activeElement;
+        var tag = activeEl ? activeEl.tagName.toLowerCase() : '';
+        if (tag === 'input' || tag === 'textarea' || (activeEl && activeEl.isContentEditable)) return;
+        var activeObj = fabricCanvas.getActiveObject();
+        if (activeObj && activeObj.isEditing) return;
+
+        var btn = document.querySelector('[data-tool="stamp"][data-shortcut="' + e.key.toLowerCase() + '"]');
+        if (btn) {
+            e.preventDefault();
+            btn.click();
+        }
+    });
+
     PdfAnnotateCore.loadDocument(canvasEl.dataset.pdfSrc).then(function (pdfDoc) {
         pagination = PdfAnnotateCore.wirePagination(
             document.querySelector('.annotation-tools'),

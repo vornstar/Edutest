@@ -12,6 +12,7 @@ require_once __DIR__ . '/../models/Paper.php';
 require_once __DIR__ . '/../models/Annotation.php';
 require_once __DIR__ . '/../models/User.php';
 require_once __DIR__ . '/../models/CustomStamp.php';
+require_once __DIR__ . '/../models/StampShortcut.php';
 require_once __DIR__ . '/../services/TeamsService.php';
 
 /**
@@ -92,6 +93,7 @@ final class ModerationController
             $markSchemes[(int) $q['id']] = Question::decryptedMarkScheme($q);
         }
         $customStamps = CustomStamp::forUser((int) $user['id']);
+        $shortcuts = StampShortcut::forUser((int) $user['id']);
 
         // Live, best-effort preview of the resolved grade from whatever's currently
         // saved for THIS moderation pass - see MarkingController::markSubmission for the

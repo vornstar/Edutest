@@ -4,10 +4,26 @@ declare(strict_types=1);
 require_once __DIR__ . '/AuthController.php';
 require_once __DIR__ . '/../models/User.php';
 require_once __DIR__ . '/../models/CustomStamp.php';
+require_once __DIR__ . '/../models/StampShortcut.php';
 
 /** Per-marker custom quick-stamps for marking (SRS 7.1) - see CustomStamp model. */
 final class StampController
 {
+    /** Sets or clears (empty key) a keyboard shortcut for one stamp - built-in or custom, matched by label, see StampShortcut. */
+    public static function setShortcut(): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        AuthController::verifyCsrf();
+
+        $label = trim((string) ($_POST['stamp_label'] ?? ''));
+        $key = trim((string) ($_POST['shortcut_key'] ?? ''));
+        if ($label !== '') {
+            StampShortcut::set((int) $user['id'], $label, $key);
+        }
+
+        self::redirectBack();
+    }
+
     public static function add(): void
     {
         $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);

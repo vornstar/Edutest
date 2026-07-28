@@ -17,6 +17,7 @@
 /** @var string|null $currentGrade live-preview grade from whatever's currently saved, or null if this paper has no grade boundaries (or no max marks set) */
 /** @var int|null $nextUnmarkedId */
 /** @var array $customStamps each: ['id' => int, 'label' => string] */
+/** @var array $shortcuts stamp_label => shortcut key, this marker's own */
 $__title = 'Marking';
 require __DIR__ . '/../partials/header.php';
 
