@@ -78,6 +78,9 @@ $hasTypedAnswers = $paper['type'] === 'digital' && empty($submission['scan_drive
                 <?php if (!$questions): ?>
                     <fieldset class="question-block">
                         <legend>Overall score<?= $paper['max_marks'] !== null ? ' (max ' . htmlspecialchars((string) $paper['max_marks']) . ')' : '' ?></legend>
+                        <?php if ($paper['mark_scheme_drive_item_id']): ?>
+                            <p><a class="btn" href="/assessment/files/papers/<?= (int) $paper['id'] ?>/markscheme" target="_blank">View mark scheme PDF</a></p>
+                        <?php endif; ?>
                         <?php if ($showPrimary && isset($primaryMarks['overall'])): ?>
                             <p><strong>Primary marker score:</strong> <?= htmlspecialchars((string) $primaryMarks['overall']['score']) ?> &mdash; <?= htmlspecialchars($primaryMarks['overall']['comment'] ?? '') ?></p>
                         <?php endif; ?>

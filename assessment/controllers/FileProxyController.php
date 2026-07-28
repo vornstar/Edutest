@@ -52,6 +52,40 @@ final class FileProxyController
         self::stream((int) $user['id'], (string) $itemId, 'paper.pdf');
     }
 
+    /**
+     * The pdf-type mark scheme PDF for a student's OWN submission -
+     * separate from paperPdf()'s teacher-only markscheme kind, since
+     * release here depends on THIS submission's assignment
+     * (self_marking_enabled + submitted/self_marked status), not just
+     * being staff - self_marking_enabled is per-assignment, not per-paper,
+     * so a plain paper-id-keyed route wouldn't have enough context to gate
+     * it correctly. Mirrors the exact check TestController::selfMarkForm()
+     * already applies before even rendering the self-marking screen.
+     */
+    public static function selfMarkScheme(int $submissionId): void
+    {
+        $user = AuthController::requireRole([User::ROLE_STUDENT]);
+        $submission = Submission::find($submissionId);
+        if (!$submission || (int) $submission['student_id'] !== (int) $user['id']) {
+            http_response_code(404);
+            exit;
+        }
+
+        $assignment = TestAssignment::find((int) $submission['assignment_id']);
+        if (!$assignment || empty($assignment['self_marking_enabled']) || !in_array($submission['status'], ['submitted', 'self_marked'], true)) {
+            http_response_code(403);
+            exit;
+        }
+
+        $paper = Paper::find((int) $assignment['paper_id']);
+        if (!$paper || !$paper['mark_scheme_drive_item_id']) {
+            http_response_code(404);
+            exit;
+        }
+
+        self::stream((int) $user['id'], (string) $paper['mark_scheme_drive_item_id'], 'mark_scheme.pdf');
+    }
+
     public static function scannedScript(int $submissionId): void
     {
         $user = AuthController::requireLogin();

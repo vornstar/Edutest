@@ -1,5 +1,6 @@
 <?php
 /** @var array $submission */
+/** @var array $paper */
 /** @var array $questions */
 /** @var array $answers */
 /** @var array $selfMarks */
@@ -40,6 +41,9 @@ require_once __DIR__ . '/../../models/Question.php';
     </form>
 
     <?php if (!$questions): ?>
+        <?php if ($paper['type'] === 'pdf' && !empty($paper['mark_scheme_drive_item_id'])): ?>
+            <p><a class="btn" href="/assessment/student/submissions/<?= (int) $submission['id'] ?>/mark-scheme" target="_blank">View mark scheme</a></p>
+        <?php endif; ?>
         <p>This paper doesn't have a question-by-question breakdown to self-mark against - your teacher will give you an overall mark and feedback instead.</p>
     <?php endif; ?>
 </div>

@@ -69,6 +69,7 @@ $routes = [
     ['POST', '/student/submissions/{id}/annotation/start-over', [TestController::class, 'startNewAnnotationVersion']],
     ['GET', '/student/submissions/{id}/self-mark', [TestController::class, 'selfMarkForm']],
     ['POST', '/student/submissions/{id}/self-mark', [TestController::class, 'selfMarkSubmit']],
+    ['GET', '/student/submissions/{id}/mark-scheme', [FileProxyController::class, 'selfMarkScheme']],
     ['GET', '/student/submissions/{id}', [StudentController::class, 'submissionSummary']],
 
     // Teacher / Subject Leader portal
