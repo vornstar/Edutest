@@ -36,6 +36,7 @@ require_once __DIR__ . '/controllers/ScanUploadController.php';
 require_once __DIR__ . '/controllers/AdminController.php';
 require_once __DIR__ . '/controllers/DataController.php';
 require_once __DIR__ . '/controllers/PagesController.php';
+require_once __DIR__ . '/controllers/MarkbookController.php';
 
 $scriptDir = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/');
 $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
@@ -126,6 +127,8 @@ $routes = [
     ['GET', '/teacher/classes/import', [TeamsController::class, 'browseTeamsClasses']],
     ['POST', '/teacher/classes/sync', [TeamsController::class, 'syncClass']],
     ['GET', '/teacher/classes/{id}', [TeamsController::class, 'classShow']],
+    ['GET', '/teacher/classes/{id}/markbook', [MarkbookController::class, 'show']],
+    ['GET', '/teacher/classes/{id}/markbook/export', [MarkbookController::class, 'exportCsv']],
 
     ['GET', '/teacher/marking', [MarkingController::class, 'queue']],
     ['GET', '/teacher/marking/{id}', [MarkingController::class, 'markSubmission']],

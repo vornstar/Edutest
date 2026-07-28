@@ -6,7 +6,10 @@ $__title = htmlspecialchars($class['name']);
 require __DIR__ . '/../partials/header.php';
 ?>
 <div class="panel">
-    <h1><?= htmlspecialchars($class['name']) ?></h1>
+    <div class="panel-header">
+        <h1><?= htmlspecialchars($class['name']) ?></h1>
+        <a class="btn" href="/assessment/teacher/classes/<?= (int) $class['id'] ?>/markbook">Markbook</a>
+    </div>
     <p><?= count($students) ?> student(s) <?= $class['teams_class_id'] ? '&middot; linked to Microsoft Teams' : '' ?></p>
 
     <h2>Roster</h2>

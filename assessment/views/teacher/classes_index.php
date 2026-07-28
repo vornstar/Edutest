@@ -22,7 +22,7 @@ require __DIR__ . '/../partials/header.php';
                 <td><?= htmlspecialchars($c['subject'] ?? '—') ?></td>
                 <td><?= $c['teams_class_id'] ? 'Yes' : 'No' ?></td>
                 <td><?= htmlspecialchars($c['last_synced_at'] ?? 'never') ?></td>
-                <td><a href="/assessment/teacher/classes/<?= (int) $c['id'] ?>">View</a></td>
+                <td><a href="/assessment/teacher/classes/<?= (int) $c['id'] ?>">View</a> &middot; <a href="/assessment/teacher/classes/<?= (int) $c['id'] ?>/markbook">Markbook</a></td>
             </tr>
         <?php endforeach; ?>
         <?php if (!$classes): ?>
