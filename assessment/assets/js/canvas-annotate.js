@@ -12,6 +12,9 @@
     'use strict';
 
     var PLACEHOLDER_TEXT = 'Comment';
+    // Matches the built-in Tick stamp's label exactly (see partials/stamp_toolbar.php) -
+    // used to count placed ticks per page for the marks-per-page helper below.
+    var TICK_LABEL = '✓';
 
     var canvasEl = document.getElementById('annotation-canvas');
     var studentLayerEl = document.getElementById('annotation-student-layer');
@@ -27,11 +30,16 @@
     var container = canvasEl.closest('.script-pane') || canvasEl.parentElement;
     var toolButtons = document.querySelectorAll('[data-tool]');
     var pageStorageKey = 'pdf-mark-page-' + submissionId;
+    var marksStorageKey = 'pdf-mark-marks-' + submissionId;
     var pagination = null;
     var fabricCanvas = null;
     var studentStaticCanvas = null;
     var lastRendered = null;
     var placeholderText = null;
+    // Set once by setupPageMarks() below, only on papers with a #page-marks-list
+    // in the mark-pane (see mark_submission.php/moderation_review.php's "Overall
+    // score" fieldset) - null everywhere else (e.g. per-question papers).
+    var pageMarksApi = null;
     // The ellipse currently being dragged out by the Circle tool, and where the
     // drag started - both null except mid-drag, reset per page like placeholderText.
     var drawingCircle = null;
@@ -176,6 +184,7 @@
             pdfDoc.numPages,
             function (pageNumber) { renderPage(pdfDoc, pageNumber); }
         );
+        setupPageMarks(pdfDoc.numPages);
         // Resume on the page the marker was last on (e.g. after a refresh)
         // rather than always restarting at page 1.
         var savedPage = parseInt(window.localStorage.getItem(pageStorageKey), 10);
@@ -301,6 +310,11 @@
                     saveAnnotation(currentPage, true);
                 }
             });
+            // Keeps the "N ticks on this page" hint (see setupPageMarks()) live as
+            // stamps are placed/removed/dragged off - a no-op when pageMarksApi is
+            // null (per-question papers have no marks-per-page list to refresh).
+            fabricCanvas.on('object:added', refreshTickHintsForCurrentPage);
+            fabricCanvas.on('object:removed', refreshTickHintsForCurrentPage);
 
             wireTools();
 
@@ -417,6 +431,118 @@
     }
 
     /**
+     * How many Tick stamps are on a given page. For the page currently on
+     * screen this reads the live canvas; for any other page it reads
+     * window.__existingAnnotations, which renderPage() keeps in sync with
+     * whatever was last saved (see saveAnnotation() below) - so it's still
+     * accurate for a page the marker has navigated away from, without
+     * needing to reload it.
+     */
+    function countTicksOnPage(pageNumber) {
+        var objects;
+        if (pageNumber === currentPage && fabricCanvas) {
+            objects = fabricCanvas.getObjects();
+        } else {
+            var existing = window.__existingAnnotations && window.__existingAnnotations[pageNumber];
+            objects = existing && existing.objects;
+        }
+        if (!objects) return 0;
+        var count = 0;
+        objects.forEach(function (o) { if (o.text === TICK_LABEL) count++; });
+        return count;
+    }
+
+    function refreshTickHintsForCurrentPage() {
+        if (pageMarksApi) pageMarksApi.refreshTickHints();
+    }
+
+    /**
+     * Builds a "mark for this page" input per PDF page inside #page-marks-list
+     * (only present on whole-paper/no-question papers - see the "Overall
+     * score" fieldset in mark_submission.php/moderation_review.php), summing
+     * them live into the #overall-score-input total. Entered marks persist
+     * to localStorage (like the current-page number already does) so a
+     * refresh mid-marking doesn't lose them - nothing is sent to the server
+     * until the marker actually submits the form, same as any other field.
+     */
+    function setupPageMarks(numPages) {
+        var listEl = document.getElementById('page-marks-list');
+        var totalInput = document.getElementById('overall-score-input');
+        if (!listEl || !totalInput) return;
+
+        var saved = {};
+        try { saved = JSON.parse(window.localStorage.getItem(marksStorageKey) || '{}'); } catch (e) { saved = {}; }
+
+        var rows = {};
+        listEl.innerHTML = '';
+        for (var p = 1; p <= numPages; p++) {
+            (function (pageNumber) {
+                var row = document.createElement('div');
+                row.className = 'page-mark-row';
+
+                var label = document.createElement('span');
+                label.className = 'page-mark-label';
+                label.textContent = 'Page ' + pageNumber + ':';
+                row.appendChild(label);
+
+                var input = document.createElement('input');
+                input.type = 'number';
+                input.step = '0.5';
+                input.min = '0';
+                input.className = 'page-mark-input';
+                if (saved[pageNumber] !== undefined) input.value = saved[pageNumber];
+                input.addEventListener('input', recalculate);
+                row.appendChild(input);
+
+                var hint = document.createElement('span');
+                hint.className = 'autosave-status page-tick-hint';
+                row.appendChild(hint);
+
+                var useBtn = document.createElement('button');
+                useBtn.type = 'button';
+                useBtn.className = 'btn';
+                useBtn.textContent = 'Use tick count';
+                useBtn.onclick = function () {
+                    input.value = countTicksOnPage(pageNumber);
+                    recalculate();
+                };
+                row.appendChild(useBtn);
+
+                listEl.appendChild(row);
+                rows[pageNumber] = { input: input, hint: hint };
+            })(p);
+        }
+
+        function recalculate() {
+            var total = 0;
+            var hasAny = false;
+            var toSave = {};
+            Object.keys(rows).forEach(function (pageNumber) {
+                var raw = rows[pageNumber].input.value;
+                var value = parseFloat(raw);
+                if (raw !== '' && !isNaN(value)) {
+                    total += value;
+                    hasAny = true;
+                    toSave[pageNumber] = raw;
+                }
+            });
+            totalInput.value = hasAny ? String(total) : '';
+            try { window.localStorage.setItem(marksStorageKey, JSON.stringify(toSave)); } catch (e) { /* storage unavailable - not fatal, marks just won't survive a refresh */ }
+        }
+
+        function refreshTickHints() {
+            Object.keys(rows).forEach(function (pageNumber) {
+                var count = countTicksOnPage(parseInt(pageNumber, 10));
+                rows[pageNumber].hint.textContent = count + (count === 1 ? ' tick on this page' : ' ticks on this page');
+            });
+        }
+
+        recalculate();
+        refreshTickHints();
+        pageMarksApi = { refreshTickHints: refreshTickHints };
+    }
+
+    /**
      * @param {fabric.Image} img the already-loaded page image, so it can be
      * re-applied as the background after loadFromJSON() - which resets
      * backgroundImage to whatever's in the JSON (nothing, once
@@ -431,8 +557,13 @@
             fabricCanvas.loadFromJSON(existing, function () {
                 fabricCanvas.setBackgroundImage(img, function () {
                     fabricCanvas.requestRenderAll();
+                    refreshTickHintsForCurrentPage();
                 });
             });
+        } else {
+            // Nothing to load (blank page so far) - still refresh so a page
+            // with a since-cleared tick count shows 0, not last page's stale count.
+            refreshTickHintsForCurrentPage();
         }
     }
 

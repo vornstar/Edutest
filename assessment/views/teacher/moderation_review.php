@@ -102,8 +102,10 @@ $__toolBtn = static function (string $tool, string $label, ?string $baseTitle = 
                         <?php if ($showPrimary && isset($primaryMarks['overall'])): ?>
                             <p><strong>Primary marker score:</strong> <?= htmlspecialchars((string) $primaryMarks['overall']['score']) ?> &mdash; <?= htmlspecialchars($primaryMarks['overall']['comment'] ?? '') ?></p>
                         <?php endif; ?>
-                        <label>Your score
-                            <input type="number" step="0.5" min="0" <?= $paper['max_marks'] !== null ? 'max="' . htmlspecialchars((string) $paper['max_marks']) . '"' : '' ?> name="overall_score">
+                        <p class="autosave-status" id="page-marks-hint">Once the script has loaded, you can type a mark per page below instead - they'll add up into the total automatically. "Use tick count" fills a page's mark in from however many tick stamps are on it.</p>
+                        <div id="page-marks-list" class="page-marks-list"></div>
+                        <label>Your total
+                            <input type="number" step="0.5" min="0" <?= $paper['max_marks'] !== null ? 'max="' . htmlspecialchars((string) $paper['max_marks']) . '"' : '' ?> name="overall_score" id="overall-score-input">
                         </label>
                         <label>Comment <textarea name="overall_comment" rows="3"></textarea></label>
                     </fieldset>
