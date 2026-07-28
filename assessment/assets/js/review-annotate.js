@@ -39,20 +39,36 @@
 
             studentCanvas = new fabric.StaticCanvas(canvasEl);
             PdfAnnotateCore.fitCanvasToContainer(studentCanvas, container, rendered.width, rendered.height);
-            fabric.Image.fromURL(rendered.dataUrl, function (img) {
-                studentCanvas.setBackgroundImage(img, studentCanvas.renderAll.bind(studentCanvas));
-            });
-            var studentJson = window.__myAnnotations && window.__myAnnotations[pageNumber];
-            if (studentJson) {
-                studentCanvas.loadFromJSON(studentJson, studentCanvas.renderAll.bind(studentCanvas));
-            }
 
             markerCanvas = new fabric.StaticCanvas(markerLayerEl);
             PdfAnnotateCore.fitCanvasToContainer(markerCanvas, container, rendered.width, rendered.height);
+            // The marker layer has no background image of its own - by
+            // design, so only their ink/stamps show and the real page
+            // underneath stays visible. A saved annotation JSON carries its
+            // OWN backgroundImage by default (see stripBackground's doc
+            // comment) - loading that here would paint a second, opaque
+            // copy of the page over everything below it.
             var markerJson = window.__markerAnnotations && window.__markerAnnotations[pageNumber];
             if (markerJson) {
-                markerCanvas.loadFromJSON(markerJson, markerCanvas.renderAll.bind(markerCanvas));
+                markerCanvas.loadFromJSON(PdfAnnotateCore.stripBackground(markerJson), function () {
+                    markerCanvas.requestRenderAll();
+                });
             }
+
+            // The background page must finish painting before the
+            // student's own annotations are loaded on top of it, or
+            // whichever finished last "wins" the render.
+            fabric.Image.fromURL(rendered.dataUrl, function (img) {
+                studentCanvas.setBackgroundImage(img, function () {
+                    studentCanvas.requestRenderAll();
+                    var studentJson = window.__myAnnotations && window.__myAnnotations[pageNumber];
+                    if (studentJson) {
+                        studentCanvas.loadFromJSON(PdfAnnotateCore.stripBackground(studentJson), function () {
+                            studentCanvas.requestRenderAll();
+                        });
+                    }
+                });
+            });
         });
     }
 })();

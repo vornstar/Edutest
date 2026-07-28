@@ -80,13 +80,12 @@ require __DIR__ . '/../partials/header.php';
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
                 <button type="submit" class="btn btn-primary">Start test</button>
             </form>
+        <?php elseif ($selfTestSubmission['status'] === 'in_progress'): ?>
+            <a class="btn btn-primary" href="/assessment/teacher/self-test/<?= (int) $selfTest['id'] ?>">Continue test</a>
         <?php else: ?>
-            <a class="btn btn-primary" href="/assessment/teacher/self-test/<?= (int) $selfTest['id'] ?>">
-                <?= $selfTestSubmission['status'] === 'in_progress' ? 'Continue test' : 'View your test answers' ?>
-            </a>
-            <?php if ($selfTestSubmission['status'] !== 'in_progress'): ?>
-                <a class="btn" href="/assessment/teacher/marking/<?= (int) $selfTestSubmission['id'] ?>">Mark your test submission</a>
-            <?php endif; ?>
+            <?php // Once submitted, the writable self-test page (Pen/Text/autosave) would just fail every save with a confusing error - the answers/annotations are read-only from here on, same as a real student reviewing their marked work. ?>
+            <a class="btn btn-primary" href="/assessment/student/submissions/<?= (int) $selfTestSubmission['id'] ?>">View your test answers</a>
+            <a class="btn" href="/assessment/teacher/marking/<?= (int) $selfTestSubmission['id'] ?>">Mark your test submission</a>
             <form method="post" action="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/delete-test" style="display:inline" onsubmit="return confirm('Delete your test submission so you can start over?');">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
                 <button type="submit" class="btn">Delete test &amp; start over</button>

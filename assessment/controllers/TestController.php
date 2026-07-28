@@ -57,8 +57,18 @@ final class TestController
             exit;
         }
 
-        $paper = Paper::find((int) $assignment['paper_id']);
         $submission = Submission::startOrGet($assignmentId, (int) $user['id']);
+
+        // Once submitted, this page's writing tools (Pen/Text/autosave) can
+        // no longer save anything - every attempt would 409 with a
+        // confusing "check your connection" error. Send the teacher to the
+        // read-only view instead, same place paper_show.php's own link goes.
+        if ($submission['status'] !== 'in_progress') {
+            header('Location: /assessment/student/submissions/' . $submission['id']);
+            exit;
+        }
+
+        $paper = Paper::find((int) $assignment['paper_id']);
         $questions = Question::forPaper((int) $paper['id']);
         $answers = Submission::answers((int) $submission['id']);
 

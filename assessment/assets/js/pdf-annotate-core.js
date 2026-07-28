@@ -78,6 +78,33 @@
     }
 
     /**
+     * fabricCanvas.toJSON() includes backgroundImage by default - harmless
+     * on the canvas it came from (it's just a redundant copy of the same
+     * page image already being rendered there), but this JSON is also the
+     * exact payload saved to the server and later loaded onto a SEPARATE,
+     * stacked reference canvas elsewhere (the read-only student layer on
+     * the marking screen, the read-only marker layer on the student's
+     * review screen) - which has no background of its own, specifically so
+     * only the ink/text shows through and the real canvas underneath stays
+     * visible. Loading a stray backgroundImage onto that layer paints a
+     * full opaque copy of the page over everything below it, hiding it
+     * completely. Stripped both before saving (so it's never persisted -
+     * also avoids needlessly encrypting/storing a full page image on every
+     * autosave) and before loading (so anything already saved with one
+     * baked in, from before this existed, is ignored rather than needing a
+     * data migration).
+     */
+    function stripBackground(json) {
+        if (json && typeof json === 'object') {
+            delete json.backgroundImage;
+            delete json.background;
+            delete json.overlayImage;
+            delete json.overlayColor;
+        }
+        return json;
+    }
+
+    /**
      * Wires a simple Prev/Next/page-indicator control set to a callback
      * that (re)renders a given page number. Returns an object with
      * .setPage(n) so callers can also change page programmatically (e.g.
@@ -112,5 +139,6 @@
         renderPageToImage: renderPageToImage,
         wirePagination: wirePagination,
         fitCanvasToContainer: fitCanvasToContainer,
+        stripBackground: stripBackground,
     };
 })(window);

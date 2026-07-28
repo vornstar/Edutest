@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/AuthController.php';
+require_once __DIR__ . '/PaperController.php';
 require_once __DIR__ . '/../models/User.php';
 require_once __DIR__ . '/../models/TestAssignment.php';
 require_once __DIR__ . '/../models/Submission.php';
@@ -20,13 +21,37 @@ final class StudentController
         require __DIR__ . '/../views/student/dashboard.php';
     }
 
+    /**
+     * Renders the exact same feedback a student sees - marks, comments, and
+     * their annotated script - for three kinds of viewer: the real student
+     * it belongs to; a self-testing teacher-portal user (startOrGet()
+     * records them as the submission's own student_id, so the ownership
+     * check below already covers this case with no special-casing); or a
+     * teacher-portal user who can at least VIEW the underlying paper (see
+     * PaperController::canViewPaper - same authority tier the Results page
+     * itself already uses, so anyone who can see a student's score there
+     * can also open "View as student" for it, nothing wider), previewing a
+     * real student's feedback. Only the page's own content is identical to
+     * what the student sees - the surrounding site header/nav still
+     * reflects whoever is actually signed in, since this isn't real
+     * account impersonation.
+     */
     public static function submissionSummary(int $submissionId): void
     {
-        $user = AuthController::requireRole([User::ROLE_STUDENT]);
+        $user = AuthController::requireLogin();
         $submission = Submission::find($submissionId);
-        if (!$submission || (int) $submission['student_id'] !== (int) $user['id']) {
+        if (!$submission) {
             http_response_code(404);
             exit;
+        }
+        $isOwner = (int) $submission['student_id'] === (int) $user['id'];
+        if (!$isOwner) {
+            $assignment = TestAssignment::find((int) $submission['assignment_id']);
+            $paper = $assignment ? Paper::find((int) $assignment['paper_id']) : null;
+            if (!$paper || !PaperController::canViewPaper($user, $paper)) {
+                http_response_code(404);
+                exit;
+            }
         }
 
         $assignment = TestAssignment::find((int) $submission['assignment_id']);

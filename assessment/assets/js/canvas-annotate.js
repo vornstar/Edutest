@@ -236,7 +236,7 @@
 
         var studentJson = window.__studentAnnotations && window.__studentAnnotations[pageNumber];
         if (studentJson) {
-            studentStaticCanvas.loadFromJSON(studentJson, function () {
+            studentStaticCanvas.loadFromJSON(PdfAnnotateCore.stripBackground(studentJson), function () {
                 studentStaticCanvas.requestRenderAll();
             });
         }
@@ -310,7 +310,7 @@
     function loadOwnAnnotation(pageNumber) {
         var existing = window.__existingAnnotations && window.__existingAnnotations[pageNumber];
         if (existing) {
-            fabricCanvas.loadFromJSON(existing, function () {
+            fabricCanvas.loadFromJSON(PdfAnnotateCore.stripBackground(existing), function () {
                 fabricCanvas.requestRenderAll();
             });
         }
@@ -322,7 +322,7 @@
         var pageNumber = page !== undefined ? page : currentPage;
         var statusEl = document.getElementById('annotation-save-status');
         if (statusEl) statusEl.textContent = 'Saving…';
-        var json = fabricCanvas.toJSON();
+        var json = PdfAnnotateCore.stripBackground(fabricCanvas.toJSON());
         // Keep the local cache in sync with what's actually saved - without
         // this, navigating back to this page later in the SAME session (no
         // full reload) would still be looking at whatever was here when the

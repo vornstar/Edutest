@@ -43,7 +43,10 @@ $statusLabels = [
                 <td><?= htmlspecialchars($s['student_name']) ?></td>
                 <td><?= htmlspecialchars($statusLabels[$s['status']] ?? $s['status']) ?></td>
                 <td><?= $row['score'] !== null ? htmlspecialchars((string) $row['score']) . ' / ' . htmlspecialchars((string) $maxTotal) : '—' ?></td>
-                <td><a class="btn" href="/assessment/teacher/marking/<?= (int) $s['id'] ?>"><?= $row['score'] !== null ? 'View/edit marks' : 'Mark' ?></a></td>
+                <td>
+                    <a class="btn" href="/assessment/teacher/marking/<?= (int) $s['id'] ?>"><?= $row['score'] !== null ? 'View/edit marks' : 'Mark' ?></a>
+                    <a class="btn" href="/assessment/student/submissions/<?= (int) $s['id'] ?>" title="See exactly what this student sees - their marks, comments, and annotated script">View as student</a>
+                </td>
             </tr>
         <?php endforeach; ?>
         <?php if (!$rows): ?>

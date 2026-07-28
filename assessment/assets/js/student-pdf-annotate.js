@@ -233,6 +233,7 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ csrf_token: csrfToken }),
         }).then(function (res) {
+            if (res.status === 409) throw new Error('finalized');
             if (!res.ok) throw new Error('start-over failed');
             return res.json();
         }).then(function () {
@@ -243,8 +244,12 @@
             fabricCanvas.getObjects().slice().forEach(function (obj) { fabricCanvas.remove(obj); });
             fabricCanvas.requestRenderAll();
             if (statusEl) statusEl.textContent = 'Started over - this page is blank again.';
-        }).catch(function () {
-            if (statusEl) statusEl.textContent = 'Could not start over - check your connection and try again.';
+        }).catch(function (err) {
+            if (statusEl) {
+                statusEl.textContent = err.message === 'finalized'
+                    ? 'This test has already been submitted, so it can no longer be changed.'
+                    : 'Could not start over - check your connection and try again.';
+            }
         });
     }
 
@@ -258,7 +263,7 @@
     function saveNow(page) {
         if (!fabricCanvas) return;
         var pageNumber = page !== undefined ? page : currentPage;
-        var json = fabricCanvas.toJSON();
+        var json = PdfAnnotateCore.stripBackground(fabricCanvas.toJSON());
         // Keep the local cache in sync with what's actually saved - without
         // this, navigating back to this page later in the SAME session (no
         // full reload) would still be looking at whatever was here when the
@@ -274,17 +279,22 @@
                 csrf_token: csrfToken,
             }),
         }).then(function (res) {
+            if (res.status === 409) throw new Error('finalized');
             if (!res.ok) throw new Error('save failed');
             if (statusEl) statusEl.textContent = 'Saved at ' + new Date().toLocaleTimeString();
-        }).catch(function () {
-            if (statusEl) statusEl.textContent = 'Autosave failed - check your connection.';
+        }).catch(function (err) {
+            if (statusEl) {
+                statusEl.textContent = err.message === 'finalized'
+                    ? 'This test has already been submitted, so further changes aren’t saved.'
+                    : 'Autosave failed - check your connection.';
+            }
         });
     }
 
     function loadExisting(pageNumber) {
         var existing = window.__existingStudentAnnotations && window.__existingStudentAnnotations[pageNumber];
         if (existing) {
-            fabricCanvas.loadFromJSON(existing, function () {
+            fabricCanvas.loadFromJSON(PdfAnnotateCore.stripBackground(existing), function () {
                 fabricCanvas.requestRenderAll();
             });
         }
