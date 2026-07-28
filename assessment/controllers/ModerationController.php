@@ -10,6 +10,7 @@ require_once __DIR__ . '/../models/TestAssignment.php';
 require_once __DIR__ . '/../models/Paper.php';
 require_once __DIR__ . '/../models/Annotation.php';
 require_once __DIR__ . '/../models/User.php';
+require_once __DIR__ . '/../models/CustomStamp.php';
 
 /**
  * Cross-teacher moderation (SRS 7.3): assignment allocation, open vs blind
@@ -88,6 +89,7 @@ final class ModerationController
         foreach ($questions as $q) {
             $markSchemes[(int) $q['id']] = Question::decryptedMarkScheme($q);
         }
+        $customStamps = CustomStamp::forUser((int) $user['id']);
 
         require __DIR__ . '/../views/teacher/moderation_review.php';
     }

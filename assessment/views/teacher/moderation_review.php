@@ -8,6 +8,7 @@
 /** @var array $primaryMarks */
 /** @var array $markSchemes */
 /** @var array $annotations */
+/** @var array $customStamps each: ['id' => int, 'label' => string] */
 $__title = 'Moderation review';
 require __DIR__ . '/../partials/header.php';
 
@@ -37,6 +38,7 @@ $hasTypedAnswers = $paper['type'] === 'digital' && empty($submission['scan_drive
                 <button type="button" data-tool="text">Text</button>
                 <button type="button" data-tool="delete">Delete selected</button>
                 <input type="color" data-tool="color" value="#059669">
+                <?php require __DIR__ . '/../partials/stamp_toolbar.php'; ?>
                 <button type="button" id="save-annotation">Save annotations</button>
                 <span class="autosave-status" id="annotation-save-status">Also saves automatically when you change page.</span>
                 <button type="button" data-page-prev>&larr; Prev</button>

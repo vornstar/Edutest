@@ -28,6 +28,7 @@ require_once __DIR__ . '/controllers/PaperController.php';
 require_once __DIR__ . '/controllers/TestController.php';
 require_once __DIR__ . '/controllers/TeamsController.php';
 require_once __DIR__ . '/controllers/MarkingController.php';
+require_once __DIR__ . '/controllers/StampController.php';
 require_once __DIR__ . '/controllers/ModerationController.php';
 require_once __DIR__ . '/controllers/FileProxyController.php';
 require_once __DIR__ . '/controllers/ScanUploadController.php';
@@ -105,6 +106,9 @@ $routes = [
     ['GET', '/teacher/marking/{id}', [MarkingController::class, 'markSubmission']],
     ['POST', '/teacher/marking/{id}', [MarkingController::class, 'saveMark']],
     ['POST', '/teacher/marking/{id}/annotation', [MarkingController::class, 'saveAnnotation']],
+
+    ['POST', '/teacher/stamps/add', [StampController::class, 'add']],
+    ['POST', '/teacher/stamps/{id}/delete', [StampController::class, 'delete']],
 
     ['GET', '/teacher/moderation/queue', [ModerationController::class, 'myQueue']],
     ['GET', '/teacher/moderation/flagged', [ModerationController::class, 'flagged']],

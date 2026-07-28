@@ -208,6 +208,20 @@ CREATE TABLE IF NOT EXISTS moderation_assignments (
     CONSTRAINT fk_mod_assigned_by FOREIGN KEY (assigned_by) REFERENCES users(id)
 ) ENGINE=InnoDB;
 
+-- A marker's own quick-stamp shortcuts (beyond the built-in Tick/Cross/
+-- SEEN/NE/LC/BOD, which aren't stored anywhere - they're hardcoded in the
+-- marking toolbar) - e.g. a personal shorthand. Placed on the canvas the
+-- same way the Text tool is, just with fixed content, so nothing else
+-- needs to know about this table: a stamp is an ordinary object in the
+-- marker's saved annotation layer once placed.
+CREATE TABLE IF NOT EXISTS custom_stamps (
+    id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id    INT UNSIGNED NOT NULL,
+    label      VARCHAR(20) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_custom_stamps_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS audit_log (
     id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     entity_type   VARCHAR(64) NOT NULL,

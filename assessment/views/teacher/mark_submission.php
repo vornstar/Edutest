@@ -15,6 +15,7 @@
 /** @var bool $viewingOldStudentVersion */
 /** @var array $markSchemes keyed by question_id */
 /** @var int|null $nextUnmarkedId */
+/** @var array $customStamps each: ['id' => int, 'label' => string] */
 $__title = 'Marking';
 require __DIR__ . '/../partials/header.php';
 
@@ -62,6 +63,7 @@ $hasTypedAnswers = $paper['type'] === 'digital' && empty($submission['scan_drive
                     <button type="button" data-tool="text">Text</button>
                     <button type="button" data-tool="delete">Delete selected</button>
                     <input type="color" data-tool="color" value="#e11d48">
+                    <?php require __DIR__ . '/../partials/stamp_toolbar.php'; ?>
                     <button type="button" id="save-annotation">Save annotations</button>
                     <span class="autosave-status" id="annotation-save-status">Also saves automatically when you change page.</span>
                     <button type="button" data-page-prev>&larr; Prev</button>

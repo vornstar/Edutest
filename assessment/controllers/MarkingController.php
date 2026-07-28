@@ -12,6 +12,7 @@ require_once __DIR__ . '/../models/Annotation.php';
 require_once __DIR__ . '/../models/User.php';
 require_once __DIR__ . '/../models/ClassRoster.php';
 require_once __DIR__ . '/../models/Moderation.php';
+require_once __DIR__ . '/../models/CustomStamp.php';
 require_once __DIR__ . '/../services/TeamsService.php';
 
 /**
@@ -93,6 +94,7 @@ final class MarkingController
         $primaryMarks = Mark::latestForSubmission($submissionId, 'primary');
         $annotations = Annotation::forSubmission($submissionId);
         $nextUnmarkedId = Submission::nextUnmarked($submissionId, (int) $paper['id']);
+        $customStamps = CustomStamp::forUser((int) $user['id']);
 
         // The teacher's own marking layer (whatever version of $annotations
         // belongs to them) is unaffected by the student-version picker below.

@@ -33,6 +33,9 @@
     // disposed and rebuilt fresh for every page - so the marker doesn't
     // have to reselect "Pen" every time they turn a page.
     var currentTool = 'pen';
+    // Which stamp (Tick/Cross/SEEN/... or a custom one) is armed when
+    // currentTool === 'stamp' - persists the same way currentTool does.
+    var currentStampLabel = null;
     // The page whose content is currently loaded into fabricCanvas - NOT
     // the same as pagination.getPage(), which by the time renderPage() is
     // invoked already reflects the page being navigated TO. Every save
@@ -145,27 +148,40 @@
 
             fabricCanvas = new fabric.Canvas(canvasEl, { isDrawingMode: true });
             PdfAnnotateCore.fitCanvasToContainer(fabricCanvas, container, rendered.width, rendered.height);
-            applyTool(currentTool);
+            applyTool(currentTool, currentStampLabel);
             fabricCanvas.on('mouse:down', function (opt) {
-                // Stays armed after placing one text box, so the next click
-                // starts another without re-clicking "Text" - but a click
-                // that lands ON an existing box edits/selects it instead.
-                if (currentTool !== 'text' || opt.target) return;
-                // No self-save needed here - the new box's own 'object:added'
-                // debounce-saves the post-discard state (see wireTools()).
-                discardPlaceholder();
-                var pointer = fabricCanvas.getPointer(opt.e);
-                var text = new fabric.IText(PLACEHOLDER_TEXT, {
-                    left: pointer.x, top: pointer.y, fill: currentColor(), fontSize: 18,
-                });
-                placeholderText = text;
-                fabricCanvas.add(text);
-                fabricCanvas.setActiveObject(text);
-                text.enterEditing();
-                // Placeholder starts fully selected, so the very first
-                // keystroke replaces it instead of the marker having to
-                // clear it themselves first.
-                text.selectAll();
+                if (opt.target) return; // clicking an existing object always just selects/edits it
+                if (currentTool === 'text') {
+                    // Stays armed after placing one text box, so the next
+                    // click starts another without re-clicking "Text".
+                    // No self-save needed here - the new box's own
+                    // 'object:added' debounce-saves the post-discard state
+                    // (see wireTools()).
+                    discardPlaceholder();
+                    var pointer = fabricCanvas.getPointer(opt.e);
+                    var text = new fabric.IText(PLACEHOLDER_TEXT, {
+                        left: pointer.x, top: pointer.y, fill: currentColor(), fontSize: 18,
+                    });
+                    placeholderText = text;
+                    fabricCanvas.add(text);
+                    fabricCanvas.setActiveObject(text);
+                    text.enterEditing();
+                    // Placeholder starts fully selected, so the very first
+                    // keystroke replaces it instead of the marker having to
+                    // clear it themselves first.
+                    text.selectAll();
+                } else if (currentTool === 'stamp' && currentStampLabel) {
+                    // A stamp is fixed content, not something the marker
+                    // types - place it and leave it selected (so it can be
+                    // dragged into position), no editing/placeholder dance.
+                    discardPlaceholder();
+                    var stampPointer = fabricCanvas.getPointer(opt.e);
+                    var stamp = new fabric.IText(currentStampLabel, {
+                        left: stampPointer.x, top: stampPointer.y, fill: currentColor(), fontSize: 26, fontWeight: 'bold',
+                    });
+                    fabricCanvas.add(stamp);
+                    fabricCanvas.setActiveObject(stamp);
+                }
             });
             fabricCanvas.on('text:editing:exited', function (opt) {
                 // Clicking away without typing anything leaves an empty/
@@ -226,10 +242,11 @@
         }
     }
 
-    function applyTool(tool) {
+    function applyTool(tool, stampLabel) {
         currentTool = tool;
+        if (tool === 'stamp') currentStampLabel = stampLabel;
         if (!fabricCanvas) return;
-        canvasEl.style.cursor = tool === 'text' ? 'crosshair' : '';
+        canvasEl.style.cursor = (tool === 'text' || tool === 'stamp') ? 'crosshair' : '';
         if (tool === 'pen') {
             fabricCanvas.isDrawingMode = true;
             fabricCanvas.freeDrawingBrush.width = 3;
@@ -238,17 +255,23 @@
             fabricCanvas.isDrawingMode = true;
             fabricCanvas.freeDrawingBrush.width = 16;
             fabricCanvas.freeDrawingBrush.color = hexToRgba(currentColor(), 0.35);
-        } else if (tool === 'text') {
-            fabricCanvas.isDrawingMode = false;
+        } else {
+            fabricCanvas.isDrawingMode = false; // 'text' and 'stamp'
         }
         toolButtons.forEach(function (btn) {
-            btn.classList.toggle('is-active', btn.dataset.tool === tool);
+            var isThisStamp = tool === 'stamp' && btn.dataset.tool === 'stamp' && btn.dataset.stamp === stampLabel;
+            var isThisTool = tool !== 'stamp' && btn.dataset.tool === tool;
+            btn.classList.toggle('is-active', isThisStamp || isThisTool);
         });
     }
 
     function wireTools() {
         toolButtons.forEach(function (btn) {
             var tool = btn.dataset.tool;
+            if (tool === 'stamp') {
+                btn.onclick = function () { applyTool('stamp', btn.dataset.stamp); };
+                return;
+            }
             if (tool !== 'pen' && tool !== 'highlighter' && tool !== 'text' && tool !== 'delete') return;
             btn.onclick = function () {
                 if (tool === 'delete') {
