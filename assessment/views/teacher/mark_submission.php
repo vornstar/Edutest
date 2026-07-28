@@ -81,6 +81,7 @@ $__toolBtn = static function (string $tool, string $label, ?string $baseTitle = 
                     <?php require __DIR__ . '/../partials/stamp_toolbar.php'; ?>
                     <button type="button" id="save-annotation">Save annotations</button>
                     <span class="autosave-status" id="annotation-save-status">Also saves automatically when you change page.</span>
+                    <button type="button" id="export-annotated-pdf" title="Flattens the script and every annotation layer into one PDF, to save or print">Download annotated PDF</button>
                     <button type="button" data-page-prev>&larr; Prev</button>
                     <span data-page-indicator>Page 1</span>
                     <button type="button" data-page-next>Next &rarr;</button>
@@ -163,6 +164,7 @@ window.__existingAnnotations = <?= json_encode($teacherAnnotations) ?>;
 window.__studentAnnotations = <?= json_encode($studentAnnotations) ?>;
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="<?= asset_url('/assets/js/pdf-annotate-core.js') ?>"></script>
 <script src="<?= asset_url('/assets/js/canvas-annotate.js') ?>"></script>
 <?php require __DIR__ . '/../partials/footer.php'; ?>

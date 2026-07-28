@@ -256,7 +256,11 @@ input[type="file"], select, textarea {
    column, instead of each piece wrapping onto its own line. */
 .page-marks-list { display: flex; flex-direction: column; gap: 0.3rem; margin: 0.5rem 0; }
 .page-mark-row { display: grid; grid-template-columns: 1.8rem 3.4rem auto; align-items: center; gap: 0.4rem; }
-.page-mark-label { font-size: 0.85rem; white-space: nowrap; }
+.page-mark-label { display: inline-block; font-size: 0.85rem; white-space: nowrap; border-radius: 4px; padding: 0.1rem 0.3rem; }
+/* Marks the row for whichever page is currently on screen - see renderPage()/
+   highlightCurrentPage() in canvas-annotate.js. Same solid-fill treatment as
+   the toolbar's own .is-active state above, just applied to the page label. */
+.page-mark-row-current .page-mark-label { background: var(--color-primary); color: var(--color-primary-contrast); }
 .page-mark-input { width: 100%; margin: 0; font-size: 0.85rem; padding: 0.2rem 0.3rem; }
 .page-tick-badge {
     justify-self: start;

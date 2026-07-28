@@ -32,6 +32,9 @@
     var pageStorageKey = 'pdf-mark-page-' + submissionId;
     var marksStorageKey = 'pdf-mark-marks-' + submissionId;
     var pagination = null;
+    // Kept around (not just local to the .then() below) so exportAnnotatedPdf()
+    // can re-render every page on demand without reloading the document.
+    var loadedPdfDoc = null;
     var fabricCanvas = null;
     var studentStaticCanvas = null;
     var lastRendered = null;
@@ -178,7 +181,11 @@
         }
     });
 
+    var exportBtn = document.getElementById('export-annotated-pdf');
+    if (exportBtn) exportBtn.onclick = exportAnnotatedPdf;
+
     PdfAnnotateCore.loadDocument(canvasEl.dataset.pdfSrc).then(function (pdfDoc) {
+        loadedPdfDoc = pdfDoc;
         pagination = PdfAnnotateCore.wirePagination(
             document.querySelector('.annotation-tools'),
             pdfDoc.numPages,
@@ -209,6 +216,7 @@
         }
         if (studentStaticCanvas) studentStaticCanvas.dispose();
         currentPage = pageNumber;
+        if (pageMarksApi) pageMarksApi.highlightCurrentPage(pageNumber);
         placeholderText = null;
         drawingCircle = null;
         circleStartPointer = null;
@@ -509,7 +517,7 @@
                 row.appendChild(tickBtn);
 
                 listEl.appendChild(row);
-                rows[pageNumber] = { input: input, tickBtn: tickBtn };
+                rows[pageNumber] = { row: row, input: input, tickBtn: tickBtn };
             })(p);
         }
 
@@ -537,9 +545,16 @@
             });
         }
 
+        /** Marks which row corresponds to the page currently on screen - see renderPage(). */
+        function highlightCurrentPage(pageNumber) {
+            Object.keys(rows).forEach(function (pn) {
+                rows[pn].row.classList.toggle('page-mark-row-current', parseInt(pn, 10) === pageNumber);
+            });
+        }
+
         recalculate();
         refreshTickHints();
-        pageMarksApi = { refreshTickHints: refreshTickHints };
+        pageMarksApi = { refreshTickHints: refreshTickHints, highlightCurrentPage: highlightCurrentPage };
     }
 
     /**
@@ -595,6 +610,103 @@
         }).catch(function () {
             if (statusEl) statusEl.textContent = 'Save failed - check your connection.';
             if (!silent) alert('Failed to save annotations.');
+        });
+    }
+
+    /**
+     * Renders one page's background image plus this marker's own marks and
+     * the student's own layer into a single flattened image, for
+     * exportAnnotatedPdf() below. Reads whatever's cached in
+     * window.__existingAnnotations/__studentAnnotations for that page (see
+     * saveAnnotation(), which keeps the former in sync on every save) rather
+     * than the live canvas, so the same logic works uniformly for every
+     * page, not just whichever one is currently on screen.
+     * @return {Promise<{dataUrl: string, widthPt: number, heightPt: number}>}
+     */
+    function buildFlattenedPageImage(pageNumber) {
+        return PdfAnnotateCore.renderPageToImage(loadedPdfDoc, pageNumber, RENDER_SCALE).then(function (rendered) {
+            return new Promise(function (resolve) {
+                var offscreen = document.createElement('canvas');
+                var flatCanvas = new fabric.StaticCanvas(offscreen);
+                flatCanvas.setWidth(rendered.width);
+                flatCanvas.setHeight(rendered.height);
+
+                var ownJson = window.__existingAnnotations && window.__existingAnnotations[pageNumber];
+                var studentJson = window.__studentAnnotations && window.__studentAnnotations[pageNumber];
+                // Marker's own marks first (drawn at the bottom), student's own
+                // layer last (drawn on top) - matches how the two live canvases
+                // are stacked on screen (see .annotation-student-layer in style.css).
+                var merged = { objects: [] };
+                if (ownJson && ownJson.objects) merged.objects = merged.objects.concat(ownJson.objects);
+                if (studentJson && studentJson.objects) merged.objects = merged.objects.concat(studentJson.objects);
+
+                fabric.Image.fromURL(rendered.dataUrl, function (img) {
+                    flatCanvas.setBackgroundImage(img, function () {
+                        flatCanvas.loadFromJSON(merged, function () {
+                            // loadFromJSON() resets backgroundImage - re-apply, same
+                            // workaround as loadOwnAnnotation() above.
+                            flatCanvas.setBackgroundImage(img, function () {
+                                flatCanvas.renderAll();
+                                resolve({
+                                    dataUrl: flatCanvas.toDataURL({ format: 'jpeg', quality: 0.92 }),
+                                    // PDF.js viewport scale=1 uses PDF points (72/inch) as its
+                                    // unit, so RENDER_SCALE is exactly the pixels-per-point this
+                                    // canvas was rendered at - divide back out to get the
+                                    // original page size for jsPDF, not the upscaled render size.
+                                    widthPt: rendered.width / RENDER_SCALE,
+                                    heightPt: rendered.height / RENDER_SCALE,
+                                });
+                                flatCanvas.dispose();
+                            });
+                        });
+                    });
+                });
+            });
+        });
+    }
+
+    /** Flattens every page (background + both annotation layers) into one downloadable PDF, for printing or saving a static copy of the marked script. */
+    function exportAnnotatedPdf() {
+        if (!loadedPdfDoc) return;
+        var jsPDFCtor = window.jspdf && window.jspdf.jsPDF;
+        if (!jsPDFCtor) {
+            alert('The PDF export library failed to load - check your connection and try again.');
+            return;
+        }
+
+        var btn = document.getElementById('export-annotated-pdf');
+        if (btn) { btn.disabled = true; btn.textContent = 'Preparing PDF…'; }
+
+        // Capture the page currently on screen too, in case it has unsaved
+        // changes - same silent save used when turning pages. The cache
+        // (window.__existingAnnotations) is updated synchronously inside
+        // saveAnnotation() before its network request even starts, so the
+        // page-building work below can safely proceed immediately after.
+        if (fabricCanvas) {
+            discardPlaceholder();
+            saveAnnotation(currentPage, true);
+        }
+
+        var pageWork = [];
+        for (var p = 1; p <= loadedPdfDoc.numPages; p++) pageWork.push(buildFlattenedPageImage(p));
+
+        Promise.all(pageWork).then(function (pages) {
+            var doc = null;
+            pages.forEach(function (page, index) {
+                var orientation = page.widthPt > page.heightPt ? 'l' : 'p';
+                if (index === 0) {
+                    doc = new jsPDFCtor({ orientation: orientation, unit: 'pt', format: [page.widthPt, page.heightPt] });
+                } else {
+                    doc.addPage([page.widthPt, page.heightPt], orientation);
+                }
+                doc.addImage(page.dataUrl, 'JPEG', 0, 0, page.widthPt, page.heightPt);
+            });
+            doc.save('submission-' + submissionId + '-annotated.pdf');
+            if (btn) { btn.disabled = false; btn.textContent = 'Download annotated PDF'; }
+        }).catch(function (err) {
+            console.error('Failed to build annotated PDF', err);
+            alert('Failed to build the annotated PDF - please try again.');
+            if (btn) { btn.disabled = false; btn.textContent = 'Download annotated PDF'; }
         });
     }
 
