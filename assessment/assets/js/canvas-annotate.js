@@ -482,7 +482,8 @@
 
                 var label = document.createElement('span');
                 label.className = 'page-mark-label';
-                label.textContent = 'Page ' + pageNumber + ':';
+                label.textContent = 'P' + pageNumber;
+                label.title = 'Page ' + pageNumber;
                 row.appendChild(label);
 
                 var input = document.createElement('input');
@@ -494,22 +495,21 @@
                 input.addEventListener('input', recalculate);
                 row.appendChild(input);
 
-                var hint = document.createElement('span');
-                hint.className = 'autosave-status page-tick-hint';
-                row.appendChild(hint);
-
-                var useBtn = document.createElement('button');
-                useBtn.type = 'button';
-                useBtn.className = 'btn';
-                useBtn.textContent = 'Use tick count';
-                useBtn.onclick = function () {
+                // Doubles as the "use tick count" action - a separate button
+                // for that plus a text hint was too wide for the mark-pane's
+                // narrow column, so a single tappable badge does both.
+                var tickBtn = document.createElement('button');
+                tickBtn.type = 'button';
+                tickBtn.className = 'page-tick-badge';
+                tickBtn.title = "Tap to use this page's tick count as its mark";
+                tickBtn.onclick = function () {
                     input.value = countTicksOnPage(pageNumber);
                     recalculate();
                 };
-                row.appendChild(useBtn);
+                row.appendChild(tickBtn);
 
                 listEl.appendChild(row);
-                rows[pageNumber] = { input: input, hint: hint };
+                rows[pageNumber] = { input: input, tickBtn: tickBtn };
             })(p);
         }
 
@@ -533,7 +533,7 @@
         function refreshTickHints() {
             Object.keys(rows).forEach(function (pageNumber) {
                 var count = countTicksOnPage(parseInt(pageNumber, 10));
-                rows[pageNumber].hint.textContent = count + (count === 1 ? ' tick on this page' : ' ticks on this page');
+                rows[pageNumber].tickBtn.textContent = count + '✓';
             });
         }
 

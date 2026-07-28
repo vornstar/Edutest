@@ -233,13 +233,25 @@ input[type="file"], select, textarea {
 .stamp-add-form button { border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-panel); color: var(--color-text) !important; font-size: 0.85rem !important; padding: 0.3rem 0.5rem !important; }
 
 /* Per-page mark entry on whole-paper/no-question papers - see setupPageMarks()
-   in canvas-annotate.js, which builds these rows once the PDF page count is known. */
-.page-marks-list { display: flex; flex-direction: column; gap: 0.35rem; margin: 0.5rem 0; }
-.page-mark-row { display: flex; align-items: center; gap: 0.5rem; }
-.page-mark-label { min-width: 4.5rem; font-size: 0.9rem; }
-.page-mark-input { width: 4.5rem; margin: 0; }
-.page-tick-hint { flex: 1; }
-.page-mark-row .btn { font-size: 0.8rem; padding: 0.25rem 0.5rem; }
+   in canvas-annotate.js, which builds these rows once the PDF page count is known.
+   A grid (not flex) so it stays a single tight row even in the mark-pane's narrow
+   column, instead of each piece wrapping onto its own line. */
+.page-marks-list { display: flex; flex-direction: column; gap: 0.3rem; margin: 0.5rem 0; }
+.page-mark-row { display: grid; grid-template-columns: 1.8rem 3.4rem auto; align-items: center; gap: 0.4rem; }
+.page-mark-label { font-size: 0.85rem; white-space: nowrap; }
+.page-mark-input { width: 100%; margin: 0; font-size: 0.85rem; padding: 0.2rem 0.3rem; }
+.page-tick-badge {
+    justify-self: start;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-panel);
+    color: var(--color-text);
+    font-size: 0.8rem;
+    white-space: nowrap;
+    padding: 0.15rem 0.6rem;
+    cursor: pointer;
+}
+.page-tick-badge:hover { border-color: var(--color-primary); color: var(--color-primary); }
 
 /* Stacks the read-only "what the student did" layer directly on top of the
    marker's own interactive canvas (which itself has the PDF as its
