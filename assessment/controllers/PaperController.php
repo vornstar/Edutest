@@ -188,6 +188,106 @@ final class PaperController
         }
     }
 
+    private static function isPdfFile(string $tmpName): bool
+    {
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime = finfo_file($finfo, $tmpName);
+        finfo_close($finfo);
+        return $mime === 'application/pdf';
+    }
+
+    /**
+     * "Bulk upload": a shared OneDrive holding area (see OneDriveService::
+     * uploadToInbox/listInbox) for exam paper/mark scheme PDFs uploaded
+     * ahead of being attached to a specific paper - lets a teacher drop in
+     * a whole batch at once (e.g. a term's worth of past papers) and then
+     * work through attaching each one to its paper whenever convenient,
+     * rather than one file-picker round trip per paper.
+     */
+    public static function inboxForm(): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+
+        $drive = new OneDriveService((int) $user['id']);
+        $files = $drive->listInbox();
+
+        $pdfPapers = array_values(array_filter(
+            Paper::visibleTo($user),
+            static fn(array $p): bool => $p['type'] === 'pdf' && self::canManagePaper($user, $p)
+        ));
+
+        require __DIR__ . '/../views/teacher/paper_inbox.php';
+    }
+
+    /** Uploads every selected file into the Inbox - non-PDF files are silently skipped rather than aborting the whole batch, since a bulk multi-file picker will often catch a stray non-PDF. */
+    public static function inboxUpload(): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        AuthController::verifyCsrf();
+
+        $files = $_FILES['files'] ?? null;
+        $uploaded = 0;
+        $skipped = 0;
+
+        if ($files && is_array($files['tmp_name'] ?? null)) {
+            $drive = new OneDriveService((int) $user['id']);
+            foreach ($files['tmp_name'] as $i => $tmpName) {
+                if (empty($tmpName) || !is_uploaded_file($tmpName)) {
+                    continue;
+                }
+                if (!self::isPdfFile($tmpName)) {
+                    $skipped++;
+                    continue;
+                }
+                $content = file_get_contents($tmpName);
+                $drive->uploadToInbox(basename((string) $files['name'][$i]), $content);
+                $uploaded++;
+            }
+        }
+
+        header('Location: /assessment/teacher/papers/inbox?uploaded=' . $uploaded . '&skipped=' . $skipped);
+        exit;
+    }
+
+    /** Moves an Inbox file onto a specific paper's exam-paper or mark-scheme slot, replacing whatever was already there. */
+    public static function attachInbox(string $itemId): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        AuthController::verifyCsrf();
+
+        $paperId = (int) ($_POST['paper_id'] ?? 0);
+        $paper = self::requireManageable($paperId, $user);
+        if ($paper['type'] !== 'pdf') {
+            http_response_code(422);
+            echo 'Only PDF-type papers can have files attached.';
+            exit;
+        }
+
+        $slot = ($_POST['slot'] ?? '') === 'markscheme' ? 'markscheme' : 'paper';
+        $filename = $slot === 'markscheme' ? 'mark_scheme.pdf' : 'paper.pdf';
+        $field = $slot === 'markscheme' ? 'mark_scheme_drive_item_id' : 'pdf_drive_item_id';
+
+        $drive = new OneDriveService((int) $user['id']);
+        $newItemId = $drive->attachInboxItem($itemId, $paperId, $filename);
+        Paper::replacePdfFile($paperId, $field, $newItemId);
+
+        header('Location: /assessment/teacher/papers/inbox?attached=1');
+        exit;
+    }
+
+    /** Discards an unwanted Inbox upload - it was never attached to anything, so there's nothing else to clean up. */
+    public static function deleteInbox(string $itemId): void
+    {
+        $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
+        AuthController::verifyCsrf();
+
+        $drive = new OneDriveService((int) $user['id']);
+        $drive->deleteInboxItem($itemId);
+
+        header('Location: /assessment/teacher/papers/inbox');
+        exit;
+    }
+
     public static function show(int $paperId): void
     {
         $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);

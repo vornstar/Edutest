@@ -173,4 +173,79 @@ final class OneDriveService
         $root = $this->resolveMasterFolder();
         $this->graph->putBinary("/drives/{$root['driveId']}/items/{$driveItemId}/content", $binaryContent, 'application/pdf');
     }
+
+    /**
+     * Uploads a PDF into {root}/Inbox/ - a holding area for bulk-uploaded
+     * exam papers/mark schemes that haven't been attached to a specific
+     * paper yet (see PaperController::inboxUpload/attachInbox). Auto-
+     * disambiguates the filename against what's already sitting in Inbox so
+     * two unrelated uploads of e.g. "markscheme.pdf" never overwrite each
+     * other before either gets attached.
+     */
+    public function uploadToInbox(string $filename, string $binaryContent): string
+    {
+        $root = $this->resolveMasterFolder();
+        $folderId = $this->ensurePath(array_merge($this->rootFolderSegments(), ['Inbox']));
+        $uniqueName = $this->uniqueChildName($root['driveId'], $folderId, $filename);
+        $path = "/drives/{$root['driveId']}/items/{$folderId}:/" . rawurlencode($uniqueName) . ':/content';
+        $result = $this->graph->putBinary($path, $binaryContent, 'application/pdf');
+        return (string) $result['id'];
+    }
+
+    /** Every real file (not folder) currently sitting in the Inbox, most recently modified first. */
+    public function listInbox(): array
+    {
+        $root = $this->resolveMasterFolder();
+        $folderId = $this->ensurePath(array_merge($this->rootFolderSegments(), ['Inbox']));
+        $children = $this->graph->getAll("/drives/{$root['driveId']}/items/{$folderId}/children", [
+            '$select' => 'id,name,size,lastModifiedDateTime,file',
+        ]);
+        $files = array_values(array_filter($children, static fn(array $c): bool => isset($c['file'])));
+        usort($files, static fn(array $a, array $b): int => strcmp((string) $b['lastModifiedDateTime'], (string) $a['lastModifiedDateTime']));
+        return $files;
+    }
+
+    /**
+     * Moves+renames an Inbox file into {root}/Papers/{paperId}/{filename} -
+     * i.e. "attaching" it, per PaperController::attachInbox(). Replaces
+     * whatever already occupies that slot (same as uploading a fresh file
+     * there directly via uploadPaperPdf), so re-attaching just swaps it out.
+     */
+    public function attachInboxItem(string $driveItemId, int $paperId, string $filename): string
+    {
+        $folderId = $this->ensurePath(array_merge($this->rootFolderSegments(), ['Papers', (string) $paperId]));
+        $root = $this->resolveMasterFolder();
+        $result = $this->graph->patch("/drives/{$root['driveId']}/items/{$driveItemId}", [
+            'name' => $filename,
+            'parentReference' => ['id' => $folderId],
+            '@microsoft.graph.conflictBehavior' => 'replace',
+        ]);
+        return (string) ($result['id'] ?? $driveItemId);
+    }
+
+    /** Discards an unwanted Inbox upload outright (not a soft delete - it was never attached to anything, so there's nothing to preserve). */
+    public function deleteInboxItem(string $driveItemId): void
+    {
+        $root = $this->resolveMasterFolder();
+        $this->graph->delete("/drives/{$root['driveId']}/items/{$driveItemId}");
+    }
+
+    /** Appends " (2)", " (3)", ... before the extension until $filename doesn't collide with an existing child of the given folder. */
+    private function uniqueChildName(string $driveId, string $folderId, string $filename): string
+    {
+        $children = $this->graph->getAll("/drives/{$driveId}/items/{$folderId}/children", ['$select' => 'name']);
+        $existing = array_map(static fn(array $c): string => strtolower((string) $c['name']), $children);
+        if (!in_array(strtolower($filename), $existing, true)) {
+            return $filename;
+        }
+
+        $info = pathinfo($filename);
+        $base = $info['filename'];
+        $ext = isset($info['extension']) ? '.' . $info['extension'] : '';
+        $n = 2;
+        while (in_array(strtolower("{$base} ({$n}){$ext}"), $existing, true)) {
+            $n++;
+        }
+        return "{$base} ({$n}){$ext}";
+    }
 }

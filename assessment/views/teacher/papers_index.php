@@ -59,6 +59,7 @@ $renderPapersTable = static function (array $papers) use ($user): void {
         <h1>Papers</h1>
         <div>
             <a class="btn" href="/assessment/teacher/groups">Groups</a>
+            <a class="btn" href="/assessment/teacher/papers/inbox">Bulk upload</a>
             <a class="btn btn-primary" href="/assessment/teacher/papers/create">New paper</a>
         </div>
     </div>
