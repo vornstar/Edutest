@@ -158,42 +158,10 @@ final class MarkingController
         }
 
         Submission::setStatus($submissionId, 'marked');
-        self::pushGradeToTeamsIfLinked($submissionId, (int) $user['id']);
+        TeamsService::pushGradeForSubmission($submissionId, (int) $user['id'], 'primary');
 
         header('Location: /assessment/teacher/marking/' . $submissionId);
         exit;
-    }
-
-    /**
-     * If this assignment was pushed to Teams (see TestController::assign),
-     * write the total score back to the matching Teams submission and
-     * release it so the student/gradebook sees it there too. Best-effort -
-     * the local mark is already saved regardless, so a Graph failure here
-     * (e.g. the roster hasn't been re-synced since this student joined, so
-     * their aad_object_id isn't known yet) must not block marking.
-     */
-    private static function pushGradeToTeamsIfLinked(int $submissionId, int $actingUserId): void
-    {
-        $submission = Submission::find($submissionId);
-        $assignment = TestAssignment::find((int) $submission['assignment_id']);
-        if (!$assignment || empty($assignment['teams_assignment_id']) || empty($assignment['class_id'])) {
-            return;
-        }
-
-        $class = ClassRoster::find((int) $assignment['class_id']);
-        $student = User::find((int) $submission['student_id']);
-        if (!$class || empty($class['teams_class_id']) || empty($student['aad_object_id'])) {
-            return;
-        }
-
-        $score = Mark::totalScore($submissionId, 'primary');
-
-        try {
-            $teams = new TeamsService($actingUserId);
-            $teams->pushGrade((string) $class['teams_class_id'], (string) $assignment['teams_assignment_id'], (string) $student['aad_object_id'], $score);
-        } catch (Throwable $e) {
-            error_log('Teams grade push failed for submission ' . $submissionId . ': ' . $e->getMessage());
-        }
     }
 
     /** Persists a Fabric.js/PDF.js vector overlay for one page as JSON. */

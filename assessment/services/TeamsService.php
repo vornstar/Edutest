@@ -5,6 +5,8 @@ require_once __DIR__ . '/GraphApiClient.php';
 require_once __DIR__ . '/../models/ClassRoster.php';
 require_once __DIR__ . '/../models/User.php';
 require_once __DIR__ . '/../models/TestAssignment.php';
+require_once __DIR__ . '/../models/Submission.php';
+require_once __DIR__ . '/../models/Mark.php';
 
 /**
  * Microsoft Teams / Education Graph API integration: class roster sync,
@@ -152,5 +154,42 @@ final class TeamsService
             ],
         ]);
         $this->graph->post("/education/classes/{$teamsClassId}/assignments/{$teamsAssignmentId}/submissions/{$match['id']}/return", []);
+    }
+
+    /**
+     * If this submission's assignment was pushed to Teams (see
+     * TestController::assign), write $markType's total score back to the
+     * matching Teams submission and release it so the student/gradebook
+     * sees it there too - called after saving primary marks
+     * (MarkingController::saveMark) AND after completing moderation
+     * (ModerationController::submitReview), so a moderation pass that
+     * changes the mark keeps Teams in sync as well, not just the initial
+     * primary mark. Best-effort: the local mark is already saved
+     * regardless, so a Graph failure here (e.g. the roster hasn't been
+     * re-synced since this student joined, so their aad_object_id isn't
+     * known yet) must not block marking/moderation.
+     */
+    public static function pushGradeForSubmission(int $submissionId, int $actingUserId, string $markType = 'primary'): void
+    {
+        $submission = Submission::find($submissionId);
+        $assignment = $submission ? TestAssignment::find((int) $submission['assignment_id']) : null;
+        if (!$assignment || empty($assignment['teams_assignment_id']) || empty($assignment['class_id'])) {
+            return;
+        }
+
+        $class = ClassRoster::find((int) $assignment['class_id']);
+        $student = User::find((int) $submission['student_id']);
+        if (!$class || empty($class['teams_class_id']) || empty($student['aad_object_id'])) {
+            return;
+        }
+
+        $score = Mark::totalScore($submissionId, $markType);
+
+        try {
+            $teams = new self($actingUserId);
+            $teams->pushGrade((string) $class['teams_class_id'], (string) $assignment['teams_assignment_id'], (string) $student['aad_object_id'], $score);
+        } catch (Throwable $e) {
+            error_log('Teams grade push failed for submission ' . $submissionId . ' (' . $markType . '): ' . $e->getMessage());
+        }
     }
 }

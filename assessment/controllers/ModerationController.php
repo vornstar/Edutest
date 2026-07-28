@@ -11,6 +11,7 @@ require_once __DIR__ . '/../models/Paper.php';
 require_once __DIR__ . '/../models/Annotation.php';
 require_once __DIR__ . '/../models/User.php';
 require_once __DIR__ . '/../models/CustomStamp.php';
+require_once __DIR__ . '/../services/TeamsService.php';
 
 /**
  * Cross-teacher moderation (SRS 7.3): assignment allocation, open vs blind
@@ -119,6 +120,7 @@ final class ModerationController
         }
 
         $result = Moderation::complete($moderationId);
+        TeamsService::pushGradeForSubmission((int) $moderation['submission_id'], (int) $user['id'], 'moderation');
         require __DIR__ . '/../views/teacher/moderation_result.php';
     }
 
