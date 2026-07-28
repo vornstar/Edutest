@@ -31,7 +31,7 @@
         if (studentCanvas) studentCanvas.dispose();
         if (markerCanvas) markerCanvas.dispose();
 
-        PdfAnnotateCore.renderPageToImage(pdfDoc, pageNumber, 1.4).then(function (rendered) {
+        PdfAnnotateCore.renderPageToImage(pdfDoc, pageNumber, PdfAnnotateCore.RENDER_SCALE).then(function (rendered) {
             canvasEl.width = rendered.width;
             canvasEl.height = rendered.height;
             markerLayerEl.width = rendered.width;

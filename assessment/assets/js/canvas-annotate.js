@@ -12,11 +12,14 @@
     'use strict';
 
     var PLACEHOLDER_TEXT = 'Comment';
-    var RENDER_SCALE = 1.8;
 
     var canvasEl = document.getElementById('annotation-canvas');
     var studentLayerEl = document.getElementById('annotation-student-layer');
     if (!canvasEl || typeof fabric === 'undefined' || !window.PdfAnnotateCore) return;
+    // Must match every other surface that renders this same PDF (student
+    // typing, review, preview) - see PdfAnnotateCore's own comment on this
+    // constant for why a mismatch here silently misplaces annotations.
+    var RENDER_SCALE = PdfAnnotateCore.RENDER_SCALE;
 
     var panel = document.querySelector('.marking-panel');
     var submissionId = panel.dataset.submissionId;

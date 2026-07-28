@@ -11,6 +11,15 @@
     'use strict';
 
     var PDFJS_VERSION = '3.11.174';
+    // Every surface that renders a PDF page - student typing, teacher
+    // marking, the student's read-only "view my marked script", the
+    // teacher's "preview as student" - MUST render at the same scale.
+    // Fabric.js annotation JSON stores raw canvas-pixel coordinates, not
+    // PDF-point or ratio coordinates, so a page rendered at a different
+    // scale than the one its saved annotations were authored against
+    // shows everything shifted toward the top-left, off whatever line/box
+    // it was actually placed on.
+    var RENDER_SCALE = 1.4;
     var loadingPromise = null;
 
     function loadPdfJs() {
@@ -43,7 +52,7 @@
     /** Renders one page to an offscreen canvas, returning its data URL and pixel size. */
     function renderPageToImage(pdfDoc, pageNumber, scale) {
         return pdfDoc.getPage(pageNumber).then(function (page) {
-            var viewport = page.getViewport({ scale: scale || 1.4 });
+            var viewport = page.getViewport({ scale: scale || RENDER_SCALE });
             var renderCanvas = document.createElement('canvas');
             renderCanvas.width = viewport.width;
             renderCanvas.height = viewport.height;
@@ -134,6 +143,7 @@
     }
 
     global.PdfAnnotateCore = {
+        RENDER_SCALE: RENDER_SCALE,
         loadPdfJs: loadPdfJs,
         loadDocument: loadDocument,
         renderPageToImage: renderPageToImage,

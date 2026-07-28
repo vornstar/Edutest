@@ -122,7 +122,7 @@
         placeholderText = null;
         try { window.localStorage.setItem(pageStorageKey, String(pageNumber)); } catch (e) { /* storage unavailable - not fatal, just won't resume on refresh */ }
 
-        PdfAnnotateCore.renderPageToImage(pdfDoc, pageNumber, 1.4).then(function (rendered) {
+        PdfAnnotateCore.renderPageToImage(pdfDoc, pageNumber, PdfAnnotateCore.RENDER_SCALE).then(function (rendered) {
             canvasEl.width = rendered.width;
             canvasEl.height = rendered.height;
             lastRendered = rendered;
