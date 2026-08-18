@@ -188,32 +188,85 @@ final class PaperController
         }
 
         if (!empty($_FILES[$fieldName]['tmp_name']) && is_uploaded_file($_FILES[$fieldName]['tmp_name'])) {
-            self::assertPdf($_FILES[$fieldName]);
-            $content = file_get_contents($_FILES[$fieldName]['tmp_name']);
+            $content = self::pdfBytesFromUpload($_FILES[$fieldName]['tmp_name'], (string) $_FILES[$fieldName]['name'], $drive);
+            if ($content === null) {
+                http_response_code(422);
+                echo 'Only PDF or Word documents (.doc, .docx) are accepted.';
+                exit;
+            }
             return $drive->uploadPaperPdf($paperId, $filename, $content);
         }
 
         return null;
     }
 
-    private static function assertPdf(array $file): void
-    {
-        $finfo = finfo_open(FILEINFO_MIME_TYPE);
-        $mime = finfo_file($finfo, $file['tmp_name']);
-        finfo_close($finfo);
-        if ($mime !== 'application/pdf') {
-            http_response_code(422);
-            echo 'Only PDF files are accepted.';
-            exit;
-        }
-    }
+    /** finfo mime type => [file extension, that extension's own canonical mime type for the upload step] - see pdfBytesFromUpload(). */
+    private const CONVERTIBLE_WORD_MIME_TYPES = [
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => ['docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+        'application/msword' => ['doc', 'application/msword'],
+    ];
 
-    private static function isPdfFile(string $tmpName): bool
+    /**
+     * Reads an uploaded file's bytes as a PDF - either because it already is
+     * one, or by converting a Word document (.doc/.docx) to PDF via
+     * Microsoft Graph's built-in conversion (see OneDriveService::
+     * convertToPdf()), so a teacher can upload a Word doc anywhere a PDF is
+     * expected and it just becomes the paper's PDF, same as if they'd
+     * exported it themselves.
+     *
+     * libmagic doesn't reliably recognise every genuine .docx by its specific
+     * OOXML content type - depending on the tool that produced it, it can
+     * fall back to reporting the generic "this is a zip file" mime type
+     * instead (confirmed while building this - a real docx can legitimately
+     * come back as application/zip). $originalFilename's extension is used
+     * as a fallback signal in that specific ambiguous case, rather than
+     * rejecting a real Word document outright just because libmagic hedged.
+     *
+     * Returns null - never exits - if the file is neither a PDF nor a Word
+     * document, or if the conversion itself fails (e.g. a corrupt document);
+     * callers decide what "invalid" should mean for their own caller (reject
+     * outright vs. skip and carry on with the rest of a batch).
+     */
+    private static function pdfBytesFromUpload(string $tmpName, string $originalFilename, OneDriveService $drive): ?string
     {
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
         $mime = finfo_file($finfo, $tmpName);
         finfo_close($finfo);
-        return $mime === 'application/pdf';
+
+        if ($mime === 'application/pdf') {
+            return file_get_contents($tmpName);
+        }
+
+        $wordFormat = self::CONVERTIBLE_WORD_MIME_TYPES[$mime] ?? self::wordFormatFromExtension($mime, $originalFilename);
+        if ($wordFormat === null) {
+            return null;
+        }
+
+        [$extension, $sourceMime] = $wordFormat;
+        try {
+            return $drive->convertToPdf(file_get_contents($tmpName), $extension, $sourceMime);
+        } catch (RuntimeException $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Extension-based fallback for exactly the ambiguous mime types a Word
+     * document can legitimately come back as from libmagic (see
+     * pdfBytesFromUpload() above) - never trusts the extension alone for a
+     * mime type libmagic would already recognise as something else entirely.
+     * @return array{0:string,1:string}|null [extension, canonical mime type]
+     */
+    private static function wordFormatFromExtension(string $detectedMime, string $originalFilename): ?array
+    {
+        $extension = strtolower(pathinfo($originalFilename, PATHINFO_EXTENSION));
+        if ($extension === 'docx' && $detectedMime === 'application/zip') {
+            return ['docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+        }
+        if ($extension === 'doc' && in_array($detectedMime, ['application/octet-stream', 'application/x-ole-storage', 'application/vnd.ms-office', 'application/CDFV2'], true)) {
+            return ['doc', 'application/msword'];
+        }
+        return null;
     }
 
     /**
@@ -239,7 +292,7 @@ final class PaperController
         require __DIR__ . '/../views/teacher/paper_inbox.php';
     }
 
-    /** Uploads every selected file into the Inbox - non-PDF files are silently skipped rather than aborting the whole batch, since a bulk multi-file picker will often catch a stray non-PDF. */
+    /** Uploads every selected file into the Inbox, converting any Word document to PDF along the way (see pdfBytesFromUpload()) - anything that's neither a PDF nor a convertible Word document is silently skipped rather than aborting the whole batch, since a bulk multi-file picker will often catch a stray unrelated file. */
     public static function inboxUpload(): void
     {
         $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
@@ -255,12 +308,17 @@ final class PaperController
                 if (empty($tmpName) || !is_uploaded_file($tmpName)) {
                     continue;
                 }
-                if (!self::isPdfFile($tmpName)) {
+                $originalName = (string) $files['name'][$i];
+                $content = self::pdfBytesFromUpload($tmpName, $originalName, $drive);
+                if ($content === null) {
                     $skipped++;
                     continue;
                 }
-                $content = file_get_contents($tmpName);
-                $drive->uploadToInbox(basename((string) $files['name'][$i]), $content);
+                // Always ends in .pdf regardless of the original filename - the
+                // content is real PDF bytes either way now, whether it started
+                // out as one or got converted from a Word document.
+                $filename = pathinfo($originalName, PATHINFO_FILENAME) . '.pdf';
+                $drive->uploadToInbox($filename, $content);
                 $uploaded++;
             }
         }
@@ -596,15 +654,23 @@ final class PaperController
         $drive = new OneDriveService((int) $user['id']);
 
         if (!empty($_FILES['paper_pdf']['tmp_name']) && is_uploaded_file($_FILES['paper_pdf']['tmp_name'])) {
-            self::assertPdf($_FILES['paper_pdf']);
-            $content = file_get_contents($_FILES['paper_pdf']['tmp_name']);
+            $content = self::pdfBytesFromUpload($_FILES['paper_pdf']['tmp_name'], (string) $_FILES['paper_pdf']['name'], $drive);
+            if ($content === null) {
+                http_response_code(422);
+                echo 'Only PDF or Word documents (.doc, .docx) are accepted.';
+                exit;
+            }
             $itemId = $drive->uploadPaperPdf($paperId, 'paper.pdf', $content);
             Paper::replacePdfFile($paperId, 'pdf_drive_item_id', $itemId);
         }
 
         if (!empty($_FILES['mark_scheme_pdf']['tmp_name']) && is_uploaded_file($_FILES['mark_scheme_pdf']['tmp_name'])) {
-            self::assertPdf($_FILES['mark_scheme_pdf']);
-            $content = file_get_contents($_FILES['mark_scheme_pdf']['tmp_name']);
+            $content = self::pdfBytesFromUpload($_FILES['mark_scheme_pdf']['tmp_name'], (string) $_FILES['mark_scheme_pdf']['name'], $drive);
+            if ($content === null) {
+                http_response_code(422);
+                echo 'Only PDF or Word documents (.doc, .docx) are accepted.';
+                exit;
+            }
             $itemId = $drive->uploadPaperPdf($paperId, 'mark_scheme.pdf', $content);
             Paper::replacePdfFile($paperId, 'mark_scheme_drive_item_id', $itemId);
         }

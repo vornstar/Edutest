@@ -42,7 +42,8 @@ require __DIR__ . '/../partials/header.php';
         </fieldset>
 
         <div id="pdf-fields" hidden>
-            <label>Exam paper PDF <input type="file" name="paper_pdf" accept="application/pdf"></label>
+            <label>Exam paper PDF or Word document <input type="file" name="paper_pdf" accept="application/pdf,.pdf,.doc,.docx"></label>
+            <p class="autosave-status">A Word document (.doc/.docx) is automatically converted to PDF on upload - check it over on the paper's page afterwards, since conversion occasionally shifts unusual formatting slightly.</p>
             <?php if ($inboxFiles): ?>
                 <label>Or choose an already-uploaded file
                     <select name="paper_pdf_inbox_id">
@@ -54,7 +55,7 @@ require __DIR__ . '/../partials/header.php';
                 </label>
             <?php endif; ?>
 
-            <label>Mark scheme PDF <input type="file" name="mark_scheme_pdf" accept="application/pdf"></label>
+            <label>Mark scheme PDF or Word document <input type="file" name="mark_scheme_pdf" accept="application/pdf,.pdf,.doc,.docx"></label>
             <?php if ($inboxFiles): ?>
                 <label>Or choose an already-uploaded file
                     <select name="mark_scheme_pdf_inbox_id">

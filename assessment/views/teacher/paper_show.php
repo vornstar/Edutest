@@ -177,11 +177,11 @@ $resolvedBoundaries = GradeBoundary::resolveForPaper($paper);
 
     <?php if ($paper['type'] === 'pdf' && $canManage): ?>
         <h2>Replace PDF files</h2>
-        <p>Upload a new file for either slot to replace what's currently stored - leave a slot empty to keep its existing file. Uploading several papers/mark schemes at once? Use <a href="/assessment/teacher/papers/inbox">Bulk upload</a> instead and attach them here later.</p>
+        <p>Upload a new file for either slot to replace what's currently stored - leave a slot empty to keep its existing file. A Word document (.doc/.docx) is automatically converted to PDF on upload. Uploading several papers/mark schemes at once? Use <a href="/assessment/teacher/papers/inbox">Bulk upload</a> instead and attach them here later.</p>
         <form method="post" action="/assessment/teacher/papers/<?= (int) $paper['id'] ?>/update-pdf" enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
-            <label>New exam paper PDF <input type="file" name="paper_pdf" accept="application/pdf"></label>
-            <label>New mark scheme PDF <input type="file" name="mark_scheme_pdf" accept="application/pdf"></label>
+            <label>New exam paper PDF or Word document <input type="file" name="paper_pdf" accept="application/pdf,.pdf,.doc,.docx"></label>
+            <label>New mark scheme PDF or Word document <input type="file" name="mark_scheme_pdf" accept="application/pdf,.pdf,.doc,.docx"></label>
             <button type="submit" class="btn">Replace file(s)</button>
         </form>
     <?php endif; ?>

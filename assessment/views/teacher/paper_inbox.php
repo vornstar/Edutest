@@ -14,7 +14,7 @@ require __DIR__ . '/../partials/header.php';
 
     <?php if (isset($_GET['uploaded'])): ?>
         <p class="autosave-status">
-            Uploaded <?= (int) $_GET['uploaded'] ?> file(s)<?= !empty($_GET['skipped']) ? ', skipped ' . (int) $_GET['skipped'] . ' non-PDF file(s)' : '' ?>.
+            Uploaded <?= (int) $_GET['uploaded'] ?> file(s)<?= !empty($_GET['skipped']) ? ', skipped ' . (int) $_GET['skipped'] . ' file(s) that were neither a PDF nor a Word document' : '' ?>.
         </p>
     <?php elseif (isset($_GET['attached'])): ?>
         <p class="autosave-status">Attached.</p>
@@ -22,7 +22,8 @@ require __DIR__ . '/../partials/header.php';
 
     <form method="post" action="/assessment/teacher/papers/inbox/upload" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
-        <label>PDF files <input type="file" name="files[]" accept="application/pdf" multiple required></label>
+        <label>PDF or Word files <input type="file" name="files[]" accept="application/pdf,.pdf,.doc,.docx" multiple required></label>
+        <p class="autosave-status">Word documents (.doc/.docx) are automatically converted to PDF on upload.</p>
         <button type="submit" class="btn btn-primary">Upload</button>
     </form>
 

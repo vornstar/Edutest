@@ -183,6 +183,42 @@ final class OneDriveService
         ];
     }
 
+    /**
+     * Converts a Word document (or anything else Graph knows how to convert)
+     * to PDF using Microsoft Graph's own built-in document-conversion
+     * feature - requesting a driveItem's content with ?format=pdf makes
+     * Graph do the actual conversion server-side, so nothing needs
+     * installing here (this app runs on shared hosting with no shell access
+     * for something like LibreOffice). The source file only exists
+     * transiently: uploaded to a scratch item under {root}/_ConvertTmp/,
+     * converted, then deleted outright - callers store the returned PDF
+     * bytes under the paper's real filename exactly as if a PDF had been
+     * uploaded directly. Throws (via GraphApiClient) if Graph can't convert
+     * the file - e.g. a corrupt document, or a source format it doesn't
+     * support - callers should treat that the same as an invalid upload.
+     */
+    public function convertToPdf(string $binaryContent, string $sourceExtension, string $sourceMimeType): string
+    {
+        $root = $this->resolveMasterFolder();
+        $folderId = $this->ensurePath(array_merge($this->rootFolderSegments(), ['_ConvertTmp']));
+        $uniqueName = $this->uniqueChildName($root['driveId'], $folderId, 'convert.' . $sourceExtension);
+        $path = "/drives/{$root['driveId']}/items/{$folderId}:/" . rawurlencode($uniqueName) . ':/content';
+        $uploaded = $this->graph->putBinary($path, $binaryContent, $sourceMimeType);
+        $itemId = (string) $uploaded['id'];
+
+        try {
+            return $this->graph->getBinary("/drives/{$root['driveId']}/items/{$itemId}/content?format=pdf");
+        } finally {
+            // Best-effort cleanup - if this fails there's a stray file sitting
+            // in the scratch folder, not a correctness problem for the caller.
+            try {
+                $this->deleteItem($itemId);
+            } catch (RuntimeException $e) {
+                // Ignored - see comment above.
+            }
+        }
+    }
+
     /** Writes back an annotated/flattened PDF, replacing the stored version. */
     public function replaceContent(string $driveItemId, string $binaryContent): void
     {
