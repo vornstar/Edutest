@@ -106,13 +106,17 @@ final class MarkingController
         $customStamps = CustomStamp::forUser((int) $user['id']);
         $shortcuts = StampShortcut::forUser((int) $user['id']);
 
-        // The teacher's own marking layer (whatever version of $annotations
-        // belongs to them) is unaffected by the student-version picker below.
+        // The teacher's own PRIMARY marking layer specifically - fetched by
+        // explicit version rather than filtered out of $annotations above,
+        // since $annotations only keeps the highest version per (page,
+        // marker) and this same person could also be this submission's
+        // moderator (see Annotation::VERSION_MODERATION's docblock), whose
+        // higher-numbered moderation-layer would otherwise silently shadow
+        // their own primary marking here. Unaffected by the student-version
+        // picker below either way.
         $teacherAnnotations = [];
-        foreach ($annotations as $a) {
-            if ((int) $a['marker_id'] === (int) $user['id']) {
-                $teacherAnnotations[(int) $a['page_number']] = json_decode($a['data_json'], true);
-            }
+        foreach (Annotation::forMarkerVersion($submissionId, (int) $user['id'], Annotation::VERSION_PRIMARY) as $a) {
+            $teacherAnnotations[(int) $a['page_number']] = json_decode($a['data_json'], true);
         }
 
         // The student's own in-PDF writing can have several versions (see
@@ -249,7 +253,16 @@ final class MarkingController
             exit;
         }
 
-        Annotation::save($submissionId, (int) ($input['page'] ?? 1), (int) $user['id'], 1, (array) ($input['fabric_json'] ?? []));
+        // This endpoint is shared by both screens (see requireAnnotatable()'s
+        // docblock) - the client says which one it's saving from (see
+        // canvas-annotate.js), and that's cross-checked against a real
+        // moderation assignment before it's trusted, so a malformed/spoofed
+        // 'mode' can't be used to write into the wrong version bucket.
+        $claimsModeration = is_string($input['mode'] ?? null) && str_starts_with((string) $input['mode'], 'moderation');
+        $isModerating = $claimsModeration && Moderation::isSecondaryMarker($submissionId, (int) $user['id']);
+        $version = $isModerating ? Annotation::VERSION_MODERATION : Annotation::VERSION_PRIMARY;
+
+        Annotation::save($submissionId, (int) ($input['page'] ?? 1), (int) $user['id'], $version, (array) ($input['fabric_json'] ?? []));
         header('Content-Type: application/json');
         echo json_encode(['saved' => true]);
     }

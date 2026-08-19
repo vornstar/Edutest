@@ -693,6 +693,12 @@
                 page: pageNumber,
                 fabric_json: json,
                 csrf_token: csrfToken,
+                // Tells the server which fixed version bucket this belongs to
+                // (see Annotation::VERSION_PRIMARY/VERSION_MODERATION) - both
+                // screens share this one save endpoint, and marker_id alone
+                // isn't enough to tell them apart when it's the same person
+                // in both roles.
+                mode: panel.dataset.mode || 'primary',
             }),
         }).then(function (res) {
             if (!res.ok) throw new Error('save failed');

@@ -13,7 +13,23 @@ require_once __DIR__ . '/Crypto.php';
  */
 final class Annotation
 {
-    /** $version: submissions.annotation_version for the student's own layer, always 1 for a teacher/moderator marker (no "start over" concept for them) - see schema.sql. */
+    /**
+     * A marker's own layer has no "start over" concept (that's a student-only
+     * thing - see submissions.annotation_version), so it always saves at one
+     * of these two FIXED versions rather than an incrementing one - EXCEPT
+     * they must be two DIFFERENT fixed versions, not both 1: the same person
+     * can end up as both a submission's primary marker and (separately)
+     * assigned as its moderator, and if primary and moderation both saved at
+     * version 1, their moderation-time marks would land on the exact same
+     * (submission, page, marker_id, version) row as their own earlier
+     * primary marking, silently overwriting it - the same failure mode as
+     * the self-test case (see MarkingController::saveAnnotation()), just
+     * triggered by the same PERSON occupying two roles instead of two
+     * IDENTITIES colliding.
+     */
+    public const VERSION_PRIMARY = 1;
+    public const VERSION_MODERATION = 2;
+
     public static function save(int $submissionId, int $pageNumber, int $markerId, int $version, array $fabricJson): void
     {
         $stmt = Database::connection()->prepare(

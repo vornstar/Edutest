@@ -141,11 +141,15 @@ $__toolBtn = static function (string $tool, string $label, ?string $baseTitle = 
 <?php if ($hasScanOrPdf): ?>
 <script>
 window.__existingAnnotations = <?php
+    // Fetched by explicit version, not filtered out of $annotations below -
+    // this same person could also be this submission's PRIMARY marker (see
+    // Annotation::VERSION_MODERATION's docblock), and $annotations only
+    // keeps the highest version per (page, marker), which would otherwise
+    // silently shadow their moderation layer with their primary one or vice
+    // versa depending on which version number happened to be higher.
     $byPage = [];
-    foreach ($annotations as $a) {
-        if ((int) $a['marker_id'] === (int) AuthController::currentUser()['id']) {
-            $byPage[(int) $a['page_number']] = json_decode($a['data_json'], true);
-        }
+    foreach (Annotation::forMarkerVersion((int) $submission['id'], (int) AuthController::currentUser()['id'], Annotation::VERSION_MODERATION) as $a) {
+        $byPage[(int) $a['page_number']] = json_decode($a['data_json'], true);
     }
     echo json_encode($byPage);
 ?>;
