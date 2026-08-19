@@ -121,6 +121,11 @@ final class MarkingController
         // marker look back at an earlier one instead, defaulting to latest
         // when absent or invalid.
         $studentId = (int) $submission['student_id'];
+        // See saveAnnotation()'s matching guard - a self-test's assigning
+        // teacher is also its own recorded student, so freehand annotation
+        // is disabled here to avoid silently overwriting what they wrote
+        // taking the test. Scores are unaffected.
+        $isOwnSelfTest = $studentId === (int) $user['id'];
         $studentVersions = Annotation::versionsForMarker($submissionId, $studentId);
         $latestStudentVersion = $studentVersions ? (int) end($studentVersions)['version'] : null;
         $selectedStudentVersion = !empty($_GET['student_version']) ? (int) $_GET['student_version'] : $latestStudentVersion;
@@ -215,7 +220,26 @@ final class MarkingController
     public static function saveAnnotation(int $submissionId): void
     {
         $user = AuthController::requireRole(User::TEACHER_PORTAL_ROLES);
-        self::requireAnnotatable($submissionId, $user);
+        $submission = self::requireAnnotatable($submissionId, $user);
+
+        // A self-test's own submission.student_id IS the assigning teacher
+        // (see TestController::takeSelfTest()) - the marker's own annotation
+        // layer is stored under marker_id = this same user id, always at
+        // version 1, which is EXACTLY the same (submission, page, marker_id,
+        // version) row the student-facing save (TestController::
+        // saveAnnotation()) already used while they were taking the test
+        // itself. Without this guard, drawing anything here would silently
+        // overwrite whatever they wrote taking the test, not add a separate
+        // marking layer on top of it - there is no marker_id left to
+        // distinguish the two roles once they're the same person. Scores
+        // (the marks table) aren't affected by this at all and still work
+        // normally - only freehand annotation is blocked.
+        if ((int) $submission['student_id'] === (int) $user['id']) {
+            http_response_code(403);
+            header('Content-Type: application/json');
+            echo json_encode(['error' => "Annotation isn't available when marking your own self-test - it can't be kept separate from what you wrote taking the test. You can still enter a score."]);
+            exit;
+        }
 
         $input = json_decode(file_get_contents('php://input'), true) ?? [];
         AuthController::bootSession();

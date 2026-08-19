@@ -29,8 +29,16 @@
     var csrfToken = panel.dataset.csrf;
     var container = canvasEl.closest('.script-pane') || canvasEl.parentElement;
     var toolButtons = document.querySelectorAll('[data-tool]');
-    var pageStorageKey = 'pdf-mark-page-' + submissionId;
-    var marksStorageKey = 'pdf-mark-marks-' + submissionId;
+    // Primary marking and moderation review are two separate passes over the
+    // SAME submission (see mark_submission.php/moderation_review.php), so
+    // submissionId alone isn't a unique-enough cache key - without
+    // data-mode, the same browser doing both (or moderating twice) would
+    // have one bleed into the other's per-page marks/tick totals, wrongly
+    // making moderation look like it's "adding to" whatever primary marking
+    // had cached instead of starting its own tally from scratch.
+    var storageKeyPrefix = 'pdf-mark-' + submissionId + '-' + (panel.dataset.mode || 'primary') + '-';
+    var pageStorageKey = storageKeyPrefix + 'page';
+    var marksStorageKey = storageKeyPrefix + 'marks';
     var pagination = null;
     // Kept around (not just local to the .then() below) so exportAnnotatedPdf()
     // can re-render every page on demand without reloading the document.

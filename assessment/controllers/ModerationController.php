@@ -88,6 +88,12 @@ final class ModerationController
         $primaryMarks = $showPrimary ? Mark::latestForSubmission((int) $submission['id'], 'primary') : [];
         $annotations = Annotation::forSubmission((int) $submission['id']);
 
+        // See MarkingController::saveAnnotation()'s matching guard - a self-test's
+        // assigning teacher is also its own recorded student, so if they're also
+        // the one moderating it, freehand annotation is disabled to avoid silently
+        // overwriting what they wrote taking the test. Scores are unaffected.
+        $isOwnSelfTest = (int) $submission['student_id'] === (int) $user['id'];
+
         $markSchemes = [];
         foreach ($questions as $q) {
             $markSchemes[(int) $q['id']] = Question::decryptedMarkScheme($q);

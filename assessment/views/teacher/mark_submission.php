@@ -18,6 +18,7 @@
 /** @var int|null $nextUnmarkedId */
 /** @var array $customStamps each: ['id' => int, 'label' => string] */
 /** @var array $shortcuts stamp_label => shortcut key, this marker's own */
+/** @var bool $isOwnSelfTest true if this submission's student IS the marker viewing it - a self-test - which disables freehand annotation, see MarkingController::saveAnnotation() */
 $__title = 'Marking';
 require __DIR__ . '/../partials/header.php';
 
@@ -41,8 +42,12 @@ $__toolBtn = static function (string $tool, string $label, ?string $baseTitle = 
         . ' title="' . htmlspecialchars($title) . '">' . htmlspecialchars($label) . '</button>';
 };
 ?>
-<div class="panel marking-panel" data-submission-id="<?= (int) $submission['id'] ?>" data-csrf="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
+<div class="panel marking-panel" data-submission-id="<?= (int) $submission['id'] ?>" data-mode="primary" data-csrf="<?= htmlspecialchars(AuthController::csrfToken()) ?>">
     <h1><?= htmlspecialchars($paper['title']) ?></h1>
+
+    <?php if ($isOwnSelfTest): ?>
+        <p><em>This is your own self-test. Freehand annotation isn't available here - it can't be kept separate from what you wrote taking the test - but you can still enter a score below.</em></p>
+    <?php endif; ?>
 
     <div class="mark-split">
         <div class="script-pane">
