@@ -106,19 +106,6 @@ final class MarkingController
         $customStamps = CustomStamp::forUser((int) $user['id']);
         $shortcuts = StampShortcut::forUser((int) $user['id']);
 
-        // The teacher's own PRIMARY marking layer specifically - fetched by
-        // explicit version rather than filtered out of $annotations above,
-        // since $annotations only keeps the highest version per (page,
-        // marker) and this same person could also be this submission's
-        // moderator (see Annotation::VERSION_MODERATION's docblock), whose
-        // higher-numbered moderation-layer would otherwise silently shadow
-        // their own primary marking here. Unaffected by the student-version
-        // picker below either way.
-        $teacherAnnotations = [];
-        foreach (Annotation::forMarkerVersion($submissionId, (int) $user['id'], Annotation::VERSION_PRIMARY) as $a) {
-            $teacherAnnotations[(int) $a['page_number']] = json_decode($a['data_json'], true);
-        }
-
         // The student's own in-PDF writing can have several versions (see
         // "Start over" - Submission::startNewAnnotationVersion). $annotations
         // above always carries the latest; ?student_version=N lets the
@@ -130,6 +117,31 @@ final class MarkingController
         // is disabled here to avoid silently overwriting what they wrote
         // taking the test. Scores are unaffected.
         $isOwnSelfTest = $studentId === (int) $user['id'];
+
+        // The teacher's own PRIMARY marking layer specifically - fetched by
+        // explicit version rather than filtered out of $annotations above,
+        // since $annotations only keeps the highest version per (page,
+        // marker) and this same person could also be this submission's
+        // moderator (see Annotation::VERSION_MODERATION's docblock), whose
+        // higher-numbered moderation-layer would otherwise silently shadow
+        // their own primary marking here. Unaffected by the student-version
+        // picker below either way.
+        // Skipped entirely for a self-test: Annotation::VERSION_PRIMARY (1)
+        // is also the default value of submissions.annotation_version, so
+        // for a self-test (marker_id === student_id) this query would
+        // otherwise pick up the student's own test-completion row - the
+        // exact content already shown read-only via $studentAnnotations
+        // below - loading it a second time into the interactive layer and
+        // rendering it as an editable duplicate stacked on top. saveAnnotation()
+        // already blocks writes for this case, so there's no genuine "marker's
+        // own layer" to show separately here.
+        $teacherAnnotations = [];
+        if (!$isOwnSelfTest) {
+            foreach (Annotation::forMarkerVersion($submissionId, (int) $user['id'], Annotation::VERSION_PRIMARY) as $a) {
+                $teacherAnnotations[(int) $a['page_number']] = json_decode($a['data_json'], true);
+            }
+        }
+
         $studentVersions = Annotation::versionsForMarker($submissionId, $studentId);
         $latestStudentVersion = $studentVersions ? (int) end($studentVersions)['version'] : null;
         $selectedStudentVersion = !empty($_GET['student_version']) ? (int) $_GET['student_version'] : $latestStudentVersion;

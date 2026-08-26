@@ -147,9 +147,17 @@ window.__existingAnnotations = <?php
     // keeps the highest version per (page, marker), which would otherwise
     // silently shadow their moderation layer with their primary one or vice
     // versa depending on which version number happened to be higher.
+    // Skipped entirely for a self-test (same guard/reasoning as
+    // MarkingController::markSubmission()'s $teacherAnnotations): if this
+    // self-test's annotation_version has reached 2 via one "Start over",
+    // VERSION_MODERATION would coincidentally match that student row too,
+    // duplicating it into this interactive layer. Freehand annotation is
+    // already blocked for self-tests either way.
     $byPage = [];
-    foreach (Annotation::forMarkerVersion((int) $submission['id'], (int) AuthController::currentUser()['id'], Annotation::VERSION_MODERATION) as $a) {
-        $byPage[(int) $a['page_number']] = json_decode($a['data_json'], true);
+    if (!$isOwnSelfTest) {
+        foreach (Annotation::forMarkerVersion((int) $submission['id'], (int) AuthController::currentUser()['id'], Annotation::VERSION_MODERATION) as $a) {
+            $byPage[(int) $a['page_number']] = json_decode($a['data_json'], true);
+        }
     }
     echo json_encode($byPage);
 ?>;
